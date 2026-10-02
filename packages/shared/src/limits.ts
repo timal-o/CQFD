@@ -9,6 +9,7 @@ export const LIMITS = {
   maxLiveNumbers: 3_000,
   maxLaserNumbers: 200,
   maxTextChars: 20_000,
+  maxLatexChars: 5_000,
   maxMessageBytes: 1_000_000,
   minParticipants: 2,
   maxParticipants: 50,

@@ -52,3 +52,13 @@ Pas de licence tldraw : il faut une clé en production, et la licence hobby dema
 - **Les textes et les formules (DOM) s'affichent toujours au-dessus des traits (canvas).**
 - **Option « suivre le prof »**, ajoutée et active par défaut : l'élève suit la page affichée par l'admin. Sa vue (zoom et position) reste libre.
 - **Kick et sessionStorage** : sessionStorage est propre à chaque onglet, donc un élève exclus qui ouvre un **nouvel onglet** obtient un nouveau jeton de session. Seul le ban par IP l'en empêche. Le critère « ne peut pas rejoindre avec le même navigateur » n'est donc tenu que pour le même onglet, sauf à utiliser localStorage, ce que le cahier des charges exclut. À trancher en phase 3.
+
+## Phase 2 : formules (2026-10-02)
+
+- **Objet `formula`** : la source LaTeX est la seule donnée stockée et transmise. L'affichage passe toujours par KaTeX en HTML statique, mis en cache, avec `trust: false` pour que le LaTeX d'un participant ne puisse pas injecter de HTML actif.
+- **MathLive est chargé à la demande**, au premier double-clic ou à la première création de formule, dans un fichier séparé (≈ 220 Ko gzip). Une seule instance de `<math-field>` existe à la fois : celle du panneau d'édition. Toutes les autres formules restent des rendus KaTeX statiques.
+- **Mode LaTeX brut** : un champ texte avec aperçu KaTeX en direct et une autocomplétion des commandes (Tab ou Entrée pour insérer). La source est partagée avec le mode visuel : basculer ne perd rien.
+- **Clavier virtuel** : c'est le clavier de MathLive, avec des onglets personnalisés (Analyse, Algèbre, Ensembles, Probas/Stats, Grec et relations, plus « 123 » et « abc »). Il est placé dans un panneau flottant déplaçable via `mathVirtualKeyboard.container`. Il s'ouvre automatiquement sur les écrans tactiles. La touche « ↵ » est retirée : on valide avec Valider ou la touche Entrée.
+- **Raccourcis de frappe et onglets** : ils se règlent dans `apps/web/src/math/config.ts`.
+- **Écart au cahier des charges** : pendant l'édition, la formule n'est visible que chez son auteur, en aperçu local. Les autres la voient à la validation, avec 1 message envoyé et 1 ligne écrite. Envoyer chaque frappe consommerait du quota pour un bénéfice faible.
+- **Taille du bundle** : KaTeX est dans le bundle principal (≈ 210 Ko gzip au total, contre ≈ 125 Ko avant), car les formules doivent s'afficher dès l'arrivée dans la salle.

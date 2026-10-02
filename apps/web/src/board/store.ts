@@ -13,7 +13,7 @@ import {
   type TextBlock,
 } from '@cqfd/shared'
 import { RoomSocket, type SocketStatus } from '../net/socket'
-import { elementBox } from './geometry'
+import { elementBox, type DomSize } from './geometry'
 import { LASER_TRAIL_MS, type Camera, type LaserTrail, type LiveStroke, type ToolSettings } from './types'
 
 export type RenderKind = 'doc' | 'live' | 'camera'
@@ -73,7 +73,8 @@ export class BoardStore {
   /** Fourni par l'éditeur de texte monté : valide l'édition en cours. */
   finishEditing: (() => void) | null = null
   private editingOriginal: BoardElement | null = null
-  textHeights = new Map<string, number>()
+  /** Tailles mesurées dans le DOM (textes, formules), en unités du monde. */
+  domSizes = new Map<string, DomSize>()
   live = new Map<string, LiveStroke>()
   lasers = new Map<string, LaserTrail>()
   activity = new Map<string, Activity>()
@@ -251,7 +252,7 @@ export class BoardStore {
       else {
         this.elements.delete(op.id)
         this.selection.delete(op.id)
-        this.textHeights.delete(op.id)
+        this.domSizes.delete(op.id)
         if (this.editingId === op.id) this.editingId = null
       }
     }
@@ -282,11 +283,7 @@ export class BoardStore {
     const el = this.elements.get(id)
     const original = this.editingOriginal
     const isDraft = this.drafts.delete(id)
-    if (this.editingId === id) {
-      this.editingId = null
-      this.editingOriginal = null
-      this.finishEditing = null
-    }
+    this.stopEditing(id)
     if (el?.type === 'text') {
       const empty = blocks.every((b) => b.runs.every((r) => r.s.trim() === ''))
       const next = { ...el, blocks }
@@ -303,6 +300,43 @@ export class BoardStore {
   private noteActivity(by: string, pageId: string, x: number, y: number, kind: Activity['kind']): void {
     if (by === this.me?.id || !Number.isFinite(x) || !Number.isFinite(y)) return
     this.activity.set(by, { pageId, x, y, t: performance.now(), kind })
+  }
+
+  /** Termine l'édition d'une formule : l'envoie, ou la supprime si elle est vide. */
+  commitFormula(id: string, latex: string): void {
+    const el = this.elements.get(id)
+    const original = this.editingOriginal
+    const isDraft = this.drafts.delete(id)
+    this.stopEditing(id)
+    if (el?.type === 'formula') {
+      const next = { ...el, latex: latex.trim() }
+      if (!next.latex) {
+        if (isDraft) this.applyLocal([{ o: 'del', id }])
+        else this.commit([{ o: 'del', id }])
+      } else if (isDraft || JSON.stringify(next) !== JSON.stringify(original)) {
+        this.commit([{ o: 'put', el: next }])
+      }
+    }
+    this.emit()
+  }
+
+  /** Annule l'édition en cours : restaure l'élément d'origine (ou retire le brouillon). */
+  cancelEditing(): void {
+    const id = this.editingId
+    if (!id) return
+    const original = this.editingOriginal
+    const isDraft = this.drafts.delete(id)
+    this.stopEditing(id)
+    if (isDraft) this.applyLocal([{ o: 'del', id }])
+    else if (original) this.applyLocal([{ o: 'put', el: original }])
+    this.emit()
+  }
+
+  private stopEditing(id: string): void {
+    if (this.editingId !== id) return
+    this.editingId = null
+    this.editingOriginal = null
+    this.finishEditing = null
   }
 
   // ---------------------------------------------------------------- messages serveur
@@ -342,7 +376,7 @@ export class BoardStore {
         this.applyLocal(msg.ops)
         const last = [...msg.ops].reverse().find((op) => op.o === 'put')
         if (last?.o === 'put') {
-          const b = elementBox(last.el, this.textHeights)
+          const b = elementBox(last.el, this.domSizes)
           this.noteActivity(msg.by, last.el.pageId, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, 'write')
         }
         break

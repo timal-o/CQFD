@@ -68,6 +68,14 @@ Phase 1 (MVP), faite :
 - sélection, déplacement, redimensionnement ;
 - laser, fonds de page, gel et verrouillage.
 
+Flèches au bord de l'écran vers l'activité hors du champ de vision (laser, tracé, modification) : un clic recentre la vue.
+
+Phase 2 (formules), faite :
+- objet formule rendu par KaTeX ;
+- édition visuelle MathLive (chargée à la demande) ou en LaTeX brut, avec aperçu et autocomplétion ;
+- clavier virtuel flottant à onglets ;
+- raccourcis de frappe (`sum`, `int`, `lim`, `sqrt`, `binom`, `alpha`…, `/` pour une fraction).
+
 Les phases suivantes sont décrites dans [docs/plan.md](docs/plan.md).
 
-Raccourcis : `V` sélection, `P` stylo, `S` surligneur, `E` gomme, `T` texte, `L` laser, `H` main. Espace + glisser pour déplacer la vue. Ctrl/⌘ + molette ou pincement pour zoomer. Suppr pour effacer la sélection.
+Raccourcis : `V` sélection, `P` stylo, `S` surligneur, `E` gomme, `T` texte, `F` formule, `L` laser, `H` main. Espace + glisser pour déplacer la vue. Ctrl/⌘ + molette ou pincement pour zoomer. Suppr pour effacer la sélection. Dans une formule : Entrée valide, Échap annule, Tab passe au champ suivant.

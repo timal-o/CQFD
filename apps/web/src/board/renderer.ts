@@ -83,7 +83,7 @@ export class BoardRenderer {
     const view = viewportBox(cam, this.width, this.height)
     for (const el of this.store.pageElements()) {
       if (el.type !== 'stroke') continue
-      if (!intersects(view, elementBox(el, this.store.textHeights))) continue
+      if (!intersects(view, elementBox(el, this.store.domSizes))) continue
       fillStroke(ctx, strokePath(el), el.tool, el.color, bg)
     }
   }

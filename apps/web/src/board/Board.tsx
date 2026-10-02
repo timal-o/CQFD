@@ -10,6 +10,7 @@ const CURSORS: Record<string, string> = {
   highlighter: 'crosshair',
   eraser: 'none',
   text: 'text',
+  formula: 'crosshair',
   laser: 'crosshair',
   hand: 'grab',
 }

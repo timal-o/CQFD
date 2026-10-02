@@ -1,4 +1,4 @@
-import { randomId, type BoardElement, type StrokeElement, type TextElement } from '@cqfd/shared'
+import { randomId, type BoardElement, type FormulaElement, type StrokeElement, type TextElement } from '@cqfd/shared'
 import type { Box, Camera } from './types'
 
 export const screenToWorld = (cam: Camera, sx: number, sy: number) => ({
@@ -56,15 +56,22 @@ function strokeBox(el: StrokeElement): Box {
   return box
 }
 
-/** Hauteur estimée d'un texte quand le DOM ne l'a pas encore mesurée. */
-export function estimateTextHeight(el: TextElement): number {
-  return Math.max(1, el.blocks.length) * el.fs * 1.5
+export interface DomSize {
+  w: number
+  h: number
 }
 
-export function elementBox(el: BoardElement, textHeights: Map<string, number>): Box {
+/** Taille estimée d'un élément DOM tant qu'il n'a pas été mesuré. */
+function estimateSize(el: TextElement | FormulaElement): DomSize {
+  if (el.type === 'text') return { w: el.w, h: Math.max(1, el.blocks.length) * el.fs * 1.5 }
+  return { w: Math.max(el.fs * 1.5, el.latex.length * el.fs * 0.45), h: el.fs * 1.8 }
+}
+
+export function elementBox(el: BoardElement, domSizes: Map<string, DomSize>): Box {
   if (el.type === 'stroke') return strokeBox(el)
-  const h = textHeights.get(el.id) ?? estimateTextHeight(el)
-  return { minX: el.x, minY: el.y, maxX: el.x + el.w, maxY: el.y + h }
+  const measured = domSizes.get(el.id) ?? estimateSize(el)
+  const w = el.type === 'text' ? el.w : measured.w
+  return { minX: el.x, minY: el.y, maxX: el.x + w, maxY: el.y + measured.h }
 }
 
 function distToSegmentSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -103,10 +110,10 @@ export function hitElement(
   px: number,
   py: number,
   radius: number,
-  textHeights: Map<string, number>,
+  domSizes: Map<string, DomSize>,
 ): boolean {
   if (el.type === 'stroke') return hitStroke(el, px, py, radius)
-  const b = elementBox(el, textHeights)
+  const b = elementBox(el, domSizes)
   return px >= b.minX - radius && px <= b.maxX + radius && py >= b.minY - radius && py <= b.maxY + radius
 }
 
@@ -130,6 +137,7 @@ export function scaleElement(el: BoardElement, ox: number, oy: number, s: number
       pts: el.pts.map((v, i) => (i % 3 === 2 ? v : round(v * s))),
     }
   }
+  if (el.type === 'formula') return { ...el, x, y, fs: clamp(round(el.fs * s), 8, 200) }
   return { ...el, x, y, w: clamp(round(el.w * s), 20, 5000), fs: clamp(round(el.fs * s), 8, 200) }
 }
 

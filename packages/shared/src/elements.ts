@@ -56,13 +56,23 @@ export const textSchema = z
     'texte trop long',
   )
 
-export const elementSchema = z.union([strokeSchema, textSchema])
+export const formulaSchema = z.object({
+  ...base,
+  type: z.literal('formula'),
+  /** Source LaTeX, rendue par KaTeX à l'affichage. */
+  latex: z.string().max(LIMITS.maxLatexChars),
+  fs: z.number().min(8).max(200),
+  color: colorSchema,
+})
+
+export const elementSchema = z.union([strokeSchema, textSchema, formulaSchema])
 
 export type StrokeElement = z.infer<typeof strokeSchema>
 export type TextRun = z.infer<typeof textRunSchema>
 export type TextBlock = z.infer<typeof textBlockSchema>
 export type TextElement = z.infer<typeof textSchema>
-export type BoardElement = StrokeElement | TextElement
+export type FormulaElement = z.infer<typeof formulaSchema>
+export type BoardElement = StrokeElement | TextElement | FormulaElement
 export type ElementType = BoardElement['type']
 
 export const PAGE_BACKGROUNDS = ['blank', 'seyes', 'grid', 'dots', 'dark'] as const

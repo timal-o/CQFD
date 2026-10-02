@@ -165,4 +165,11 @@ describe('protocole', () => {
     const huge = { ...text, blocks: [{ k: 'p', runs: [{ s: 'a'.repeat(15000) }, { s: 'b'.repeat(15000) }] }] }
     expect(parseClientMessage(JSON.stringify({ t: 'ops', seq: 2, ops: [{ o: 'put', el: huge }] }))).toBeNull()
   })
+
+  it('valide les formules', () => {
+    const formula = { id: 'f1', pageId: 'p1', authorId: 'prof', z: 3, x: 0, y: 0, type: 'formula', latex: '\\sum_{k=0}^{n} \\binom{n}{k} x^k', fs: 28, color: '#111827' }
+    expect(parseClientMessage(JSON.stringify({ t: 'ops', seq: 3, ops: [{ o: 'put', el: formula }] }))).not.toBeNull()
+    const tooLong = { ...formula, latex: 'x'.repeat(5001) }
+    expect(parseClientMessage(JSON.stringify({ t: 'ops', seq: 3, ops: [{ o: 'put', el: tooLong }] }))).toBeNull()
+  })
 })

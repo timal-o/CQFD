@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useReducer, useRef } from 'react'
-import type { TextElement } from '@cqfd/shared'
+import type { FormulaElement, TextElement } from '@cqfd/shared'
+import { renderLatex } from '../math/katex'
 import { domToBlocks, fillEditor } from './richtext'
 import { inkColor } from './render'
 import type { BoardStore } from './store'
@@ -15,21 +16,38 @@ function useDocVersion(store: BoardStore): void {
   }, [store])
 }
 
-/** Calque DOM des zones de texte, transformé par la caméra (voir BoardRenderer). */
+/** Calque DOM des textes et des formules, transformé par la caméra (voir BoardRenderer). */
 export function TextLayer({ store }: { store: BoardStore }) {
   useDocVersion(store)
   const bg = store.page?.bg ?? 'blank'
-  const texts = store.pageElements().filter((e): e is TextElement => e.type === 'text')
   return (
     <>
-      {texts.map((el) =>
-        store.editingId === el.id ? (
+      {store.pageElements().map((el) => {
+        if (el.type === 'formula') {
+          return <FormulaView key={el.id} store={store} el={el} bg={bg} editing={store.editingId === el.id} />
+        }
+        if (el.type !== 'text') return null
+        return store.editingId === el.id ? (
           <TextEditor key={el.id} store={store} el={el} bg={bg} />
         ) : (
           <TextView key={el.id} store={store} el={el} bg={bg} />
-        ),
-      )}
+        )
+      })}
     </>
+  )
+}
+
+/** Formule inactive : rendu KaTeX statique (jamais de MathLive ici). */
+function FormulaView({ store, el, bg, editing }: { store: BoardStore; el: FormulaElement; bg: string; editing: boolean }) {
+  const ref = useMeasure(store, el.id)
+  const html = el.latex ? renderLatex(el.latex) : ''
+  return (
+    <div
+      ref={ref}
+      className={`formula-el${editing ? ' editing' : ''}${html ? '' : ' empty'}`}
+      style={{ left: el.x, top: el.y, fontSize: el.fs, color: inkColor(el.color, bg === 'dark' ? 'dark' : 'blank') }}
+      dangerouslySetInnerHTML={{ __html: html || '<span class="formula-empty">formule</span>' }}
+    />
   )
 }
 
@@ -39,9 +57,11 @@ function useMeasure(store: BoardStore, id: string) {
     const node = ref.current
     if (!node) return
     const update = () => {
+      const w = node.offsetWidth
       const h = node.offsetHeight
-      if (store.textHeights.get(id) !== h) {
-        store.textHeights.set(id, h)
+      const prev = store.domSizes.get(id)
+      if (prev?.w !== w || prev?.h !== h) {
+        store.domSizes.set(id, { w, h })
         store.requestRender('live')
       }
     }

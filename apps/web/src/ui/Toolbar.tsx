@@ -1,4 +1,4 @@
-import { Eraser, Hand, Highlighter, Minus, MousePointer2, Pen, Plus, Target, Trash2, Type } from 'lucide-react'
+import { Eraser, Hand, Highlighter, Minus, MousePointer2, Pen, Plus, Sigma, Target, Trash2, Type } from 'lucide-react'
 import type { BoardController } from '../board/controller'
 import { HIGHLIGHTER_COLORS, PEN_COLORS, PEN_SIZES, type BoardStore } from '../board/store'
 import type { Tool } from '../board/types'
@@ -9,6 +9,7 @@ const TOOLS: { tool: Tool; label: string; key: string; icon: React.ReactNode; wr
   { tool: 'highlighter', label: 'Surligneur', key: 'S', icon: <Highlighter size={20} />, write: true },
   { tool: 'eraser', label: 'Gomme', key: 'E', icon: <Eraser size={20} />, write: true },
   { tool: 'text', label: 'Texte', key: 'T', icon: <Type size={20} />, write: true },
+  { tool: 'formula', label: 'Formule', key: 'F', icon: <Sigma size={20} />, write: true },
   { tool: 'laser', label: 'Pointeur laser', key: 'L', icon: <Target size={20} /> },
   { tool: 'hand', label: 'Déplacer la vue', key: 'H', icon: <Hand size={20} /> },
 ]
@@ -71,7 +72,7 @@ export function Toolbar({ store, controller }: { store: BoardStore; controller: 
         </div>
       )}
 
-      {canWrite && t.tool === 'text' && (
+      {canWrite && (t.tool === 'text' || t.tool === 'formula') && (
         <div className="tool-group">
           {PEN_COLORS.map((c) => (
             <Swatch key={c} color={c} active={t.textColor === c} onClick={() => store.setTools({ textColor: c })} />

@@ -911,3 +911,260 @@ button.small:hover {
     bottom: 72px;
   }
 }
+
+/* ------------------------------------------------------------ formules */
+
+.formula-el {
+  position: absolute;
+  white-space: nowrap;
+  line-height: 1.2;
+  padding: 0.1em 0.2em;
+}
+
+.formula-el .katex-display {
+  margin: 0;
+  text-align: left;
+}
+
+.formula-el .katex-display > .katex {
+  text-align: left;
+}
+
+.formula-el.editing {
+  outline: 2px dashed #93b4ff;
+  outline-offset: 4px;
+}
+
+.formula-empty {
+  display: inline-block;
+  font-size: 0.6em;
+  color: #94a3b8;
+  border: 1px dashed #94a3b8;
+  border-radius: 4px;
+  padding: 0.2em 0.6em;
+  font-family: system-ui, sans-serif;
+}
+
+/* ------------------------------------------------------------ éditeur de formule */
+
+.formula-editor {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 15;
+}
+
+.fe-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fe-spacer {
+  flex: 1;
+}
+
+.segmented {
+  display: inline-flex;
+  background: #eef0f3;
+  border-radius: 8px;
+  padding: 2px;
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.segmented button.on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.fe-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fe-btn.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.fe-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.fe-field {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+}
+
+.fe-field math-field {
+  width: 100%;
+  font-size: 26px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.fe-field math-field::part(virtual-keyboard-toggle),
+.fe-field math-field::part(menu-toggle) {
+  display: none;
+}
+
+.fe-latex {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.fe-latex-input {
+  position: relative;
+}
+
+.fe-latex textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 64px;
+  resize: vertical;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 15px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.fe-suggest {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  min-width: 220px;
+  z-index: 2;
+}
+
+.fe-suggest li {
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.fe-suggest li.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.fe-preview {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 22px;
+  overflow-x: auto;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+}
+
+.fe-preview .katex-display {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .fe-latex {
+    grid-template-columns: 1fr;
+  }
+
+  .formula-editor {
+    bottom: 72px;
+  }
+}
+
+/* ------------------------------------------------------------ clavier mathématique flottant */
+
+.math-keyboard {
+  position: fixed;
+  width: min(680px, calc(100vw - 16px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+  z-index: 40;
+  overflow: hidden;
+}
+
+.mk-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.mk-head span {
+  flex: 1;
+}
+
+.mk-body {
+  position: relative;
+}
+
+/* Le clavier MathLive est conçu pour être ancré en bas de la page : on le remet dans le flux
+   pour que le panneau flottant prenne sa taille naturelle. */
+.mk-body .ML__keyboard {
+  position: relative !important;
+  height: auto !important;
+}
+
+.mk-body .MLK__backdrop,
+.mk-body .MLK__plate {
+  position: relative !important;
+  inset: auto !important;
+  height: auto !important;
+  transform: none !important;
+}
+
+.mk-body .MLK__plate {
+  padding-bottom: 6px;
+}

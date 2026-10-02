@@ -1,4 +1,13 @@
-import { LIMITS, randomId, SEND_INTERVALS, type BoardElement, type Op, type StrokeElement, type TextElement } from '@cqfd/shared'
+import {
+  LIMITS,
+  randomId,
+  SEND_INTERVALS,
+  type BoardElement,
+  type FormulaElement,
+  type Op,
+  type StrokeElement,
+  type TextElement,
+} from '@cqfd/shared'
 import {
   eraseFromStroke,
   elementBox,
@@ -58,7 +67,12 @@ const MAX_STROKE_TRIPLETS = Math.floor(LIMITS.maxStrokeNumbers / 3) - 10
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
-  (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')
+  (target.isContentEditable ||
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.tagName === 'MATH-FIELD' ||
+    target.closest('[data-no-shortcuts]') !== null)
 
 /**
  * Gestion des entrées : stylet, souris, doigts (rejet de la paume), molette, clavier.
@@ -130,7 +144,7 @@ export class BoardController {
         [...store.selection]
           .map((id) => store.elements.get(id))
           .filter((e): e is BoardElement => !!e)
-          .map((e) => elementBox(e, store.textHeights)),
+          .map((e) => elementBox(e, store.domSizes)),
       )
     }
     return {
@@ -266,6 +280,8 @@ export class BoardController {
       }
       case 'text':
         return this.textAt(w.x, w.y)
+      case 'formula':
+        return this.formulaAt(w.x, w.y)
       case 'select':
         return this.selectDown(e, pos, w)
       default:
@@ -404,7 +420,7 @@ export class BoardController {
       case 'marquee': {
         if (!g.additive) this.store.selection.clear()
         for (const el of this.store.pageElements()) {
-          if (this.store.canEdit(el) && intersects(g.box, elementBox(el, this.store.textHeights))) {
+          if (this.store.canEdit(el) && intersects(g.box, elementBox(el, this.store.domSizes))) {
             this.store.selection.add(el.id)
           }
         }
@@ -560,7 +576,7 @@ export class BoardController {
     for (let i = list.length - 1; i >= 0; i--) {
       const el = list[i]!
       if (editableOnly && !this.store.canEdit(el)) continue
-      if (hitElement(el, x, y, radius, this.store.textHeights)) return el
+      if (hitElement(el, x, y, radius, this.store.domSizes)) return el
     }
     return null
   }
@@ -665,13 +681,39 @@ export class BoardController {
     store.startEditing(el.id)
   }
 
+  private formulaAt(x: number, y: number): void {
+    const store = this.store
+    if (!store.canWrite) return this.denied(this.writeDeniedMessage())
+    const hit = this.topHit(x, y, true)
+    if (hit?.type === 'formula') {
+      store.startEditing(hit.id)
+      return
+    }
+    const z = store.camera().z
+    const el: FormulaElement = {
+      id: randomId(),
+      pageId: store.pageId!,
+      authorId: store.me!.id,
+      z: store.nextZ(),
+      type: 'formula',
+      x: Math.round(x),
+      y: Math.round(y - 20 / z),
+      latex: '',
+      fs: Math.max(8, Math.min(200, Math.round(28 / z))),
+      color: store.tools.textColor,
+    }
+    store.drafts.add(el.id)
+    store.applyLocal([{ o: 'put', el }])
+    store.startEditing(el.id)
+  }
+
   private onDoubleClick(e: MouseEvent): void {
     const tool = this.store.tools.tool
-    if (tool !== 'select' && tool !== 'text') return
+    if (tool !== 'select' && tool !== 'text' && tool !== 'formula') return
     if ((e.target as HTMLElement).closest('[data-editor]')) return
     const w = this.world(e)
     const hit = this.topHit(w.x, w.y, true)
-    if (hit?.type === 'text' && this.store.canWrite) this.store.startEditing(hit.id)
+    if ((hit?.type === 'text' || hit?.type === 'formula') && this.store.canWrite) this.store.startEditing(hit.id)
   }
 
   // ---------------------------------------------------------------- molette et clavier
@@ -713,6 +755,7 @@ export class BoardController {
       s: { tool: 'highlighter' },
       e: { tool: 'eraser' },
       t: { tool: 'text' },
+      f: { tool: 'formula' },
       l: { tool: 'laser' },
       h: { tool: 'hand' },
     }

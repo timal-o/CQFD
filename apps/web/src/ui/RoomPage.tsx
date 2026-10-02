@@ -5,6 +5,7 @@ import type { BoardController } from '../board/controller'
 import { OffscreenIndicators } from '../board/OffscreenIndicators'
 import { BoardStore } from '../board/store'
 import { captureAdminFragment, session } from '../lib/session'
+import { FormulaEditor } from '../math/FormulaEditor'
 import { PageTabs } from './PageTabs'
 import { ParticipantsPanel } from './ParticipantsPanel'
 import { navigate } from './router'
@@ -120,6 +121,9 @@ function Room({ code, name }: { code: string; name: string }) {
         {store.me && <OffscreenIndicators store={store} />}
         <Toolbar store={store} controller={controller} />
         {store.editingId && <TextToolbar store={store} />}
+        {store.editingId && store.elements.get(store.editingId)?.type === 'formula' && (
+          <FormulaEditor key={store.editingId} store={store} />
+        )}
         {peopleOpen && <ParticipantsPanel store={store} onClose={() => setPeopleOpen(false)} />}
         {store.status === 'reconnecting' && <div className="banner">Connexion perdue, reconnexion…</div>}
         <div className="toasts" aria-live="polite">
