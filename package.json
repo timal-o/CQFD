@@ -1,0 +1,19 @@
+{
+  "name": "cqfd",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.8.1",
+  "scripts": {
+    "dev": "concurrently -k -n realtime,web -c magenta,cyan \"pnpm --filter @cqfd/realtime dev\" \"pnpm --filter @cqfd/web dev\"",
+    "build": "pnpm --filter @cqfd/web build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck",
+    "deploy": "pnpm build && pnpm --filter @cqfd/realtime deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

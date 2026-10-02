@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cqfd",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  // Front (SPA) servi en assets statiques : gratuit et illimité, le Worker
+  // n'est invoqué que pour /api/* et /ws/*.
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "Room" }]
+  },
+  // Plan gratuit : uniquement des Durable Objects SQLite.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
+  "vars": {
+    // Délai avant effacement d'une salle vide.
+    "ROOM_GRACE_MINUTES": "30",
+    // Origines supplémentaires autorisées (séparées par des virgules), ex. le serveur Vite en dev.
+    "EXTRA_ORIGINS": ""
+  },
+  "routes": [{ "pattern": "cqfd.malorey.fr", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  // Pas de journaux persistants : on ne garde aucune donnée de séance.
+  "observability": { "enabled": false }
+}

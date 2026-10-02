@@ -1,0 +1,2 @@
+EXTRA_ORIGINS=http://localhost:5173
+ROOM_GRACE_MINUTES=2

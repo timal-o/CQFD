@@ -1,0 +1,17 @@
+{
+  "name": "@cqfd/realtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mkdir -p ../web/dist && wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@cqfd/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "^4.146.0"
+  }
+}
