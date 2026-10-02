@@ -5,6 +5,7 @@ const NOUNS: Record<ElementType, [singular: string, plural: string]> = {
   text: ['un texte', 'textes'],
   formula: ['une formule', 'formules'],
   graph: ['un repère', 'repères'],
+  image: ['une image', 'images'],
 }
 
 function describe(types: ElementType[]): string {

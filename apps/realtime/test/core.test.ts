@@ -569,3 +569,39 @@ describe('lignes lues (quota)', () => {
     expect(core.pages().map((p) => p.name)).toEqual(['Page 1', 'Bis'])
   })
 })
+
+describe('images posées sur le tableau', () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]).toString('base64')
+  const image = (id: string, authorId: string, asset: string) =>
+    ({ id, pageId: 'page1', authorId, z: 5, x: 10, y: 10, type: 'image', w: 200, h: 100, asset }) as const
+
+  it('un élève qui a la main envoie le fichier puis pose l’image', () => {
+    const prof = connect('Prof', 'sp', { admin: true })
+    const eleve = connect('Léa', 's1')
+    core.handle(prof, { t: 'grant', pid: pid(eleve), on: true })
+    core.handle(eleve, { t: 'asset', purpose: 'element', id: 'img1', pageId: 'page1', mime: 'image/png', w: 200, h: 100, idx: 0, total: 1, data: png })
+    send(eleve, [put(image('i1', pid(eleve), 'img1'))])
+    expect(eleve.last('ack')).toBeDefined()
+    expect(prof.last('ops')?.ops[0]).toMatchObject({ o: 'put', el: { type: 'image', asset: 'img1' } })
+    // Une image d'élément ne devient pas le fond de la page.
+    expect(core.pages()[0]!.image).toBeNull()
+    expect(prof.last('log')?.entries[0]?.summary).toBe('a ajouté une image')
+  })
+
+  it('sans la main : pas d’envoi de fichier', () => {
+    connect('Prof', 'sp', { admin: true })
+    const eleve = connect('Léa', 's1')
+    core.handle(eleve, { t: 'asset', purpose: 'element', id: 'img2', pageId: 'page1', mime: 'image/png', w: 1, h: 1, idx: 0, total: 1, data: png })
+    expect(core.readAsset('img2')).toBeNull()
+    expect(eleve.last('error')?.code).toBe('forbidden')
+  })
+
+  it('une image qui pointe vers un fichier absent ou incomplet est refusée', () => {
+    const prof = connect('Prof', 'sp', { admin: true })
+    send(prof, [put(image('i2', pid(prof), 'inexistant'))])
+    expect(prof.last('nack')?.reason).toMatch(/Image introuvable/)
+    core.handle(prof, { t: 'asset', purpose: 'element', id: 'part', pageId: 'page1', mime: 'image/png', w: 1, h: 1, idx: 0, total: 2, data: png })
+    send(prof, [put(image('i3', pid(prof), 'part'))])
+    expect(prof.last('nack')?.reason).toMatch(/Image introuvable/)
+  })
+})

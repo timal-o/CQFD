@@ -236,7 +236,16 @@ export class BoardStore {
     if (!this.pageId) return
     this.cameras.set(this.pageId, cam)
     this.requestRender('camera')
+    // L'interface (indicateur de zoom) suit, au plus une fois par image affichée.
+    if (!this.cameraEmit) {
+      this.cameraEmit = requestAnimationFrame(() => {
+        this.cameraEmit = 0
+        this.emit()
+      })
+    }
   }
+
+  private cameraEmit = 0
 
   /** Éléments de la page courante, triés par z. */
   pageElements(): BoardElement[] {

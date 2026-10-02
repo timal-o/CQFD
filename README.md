@@ -70,6 +70,7 @@ Aucun secret n'est nécessaire : les jetons admin sont générés par salle, et 
   - stylo sensible à la pression, surligneur, gomme par trait ou pixel ;
   - trait droit avec Maj, formes propres (cercle, ellipse, rectangle, triangle) en restant immobile à la fin du geste ;
   - texte formaté, formule (KaTeX/MathLive), repère avec courbes y = f(x) ;
+  - images (bouton, Ctrl+V ou glisser-déposer), compressées et stockées dans la salle ;
   - sélection, déplacement, redimensionnement, laser.
 - **Maths** :
   - éditeur visuel MathLive ou LaTeX brut avec aperçu et autocomplétion ;
@@ -88,7 +89,7 @@ Aucun secret n'est nécessaire : les jetons admin sont générés par salle, et 
 Raccourcis :
 - outils : `V` sélection, `P` stylo, `S` surligneur, `E` gomme, `T` texte, `F` formule, `G` repère, `L` laser, `H` main ;
 - historique : Ctrl/⌘+Z annuler, Ctrl+Y ou Ctrl+Maj+Z rétablir ;
-- vue : Espace + glisser pour se déplacer, Ctrl/⌘ + molette ou pincement pour zoomer ;
+- vue : molette pour zoomer ; glisser dans le vide (outil Sélection), Espace + glisser ou clic molette pour se déplacer ; Maj + glisser pour sélectionner par rectangle ;
 - sélection : Suppr pour effacer ;
 - formule : Entrée valide, Échap annule, Tab passe au champ suivant.
 

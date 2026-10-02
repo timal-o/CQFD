@@ -1,27 +1,12 @@
 import { LIMITS, randomId } from '@cqfd/shared'
 import type { BoardStore } from '../board/store'
+import { encodeCanvas, sendAsset } from './assets'
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** Largeur de rendu d'une page de PDF (px du monde) : lisible sans être trop lourde. */
 const RENDER_WIDTH = 1400
 const MAX_PAGES = 30
-const CHUNK_BYTES = 500_000
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-function toBase64(bytes: Uint8Array): string {
-  let bin = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(bin)
-}
-
-async function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
-  // On baisse la qualité jusqu'à tenir sous le plafond par image.
-  for (const quality of [0.8, 0.65, 0.5, 0.35]) {
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', quality))
-    if (blob && blob.size <= LIMITS.maxAssetBytes) return new Uint8Array(await blob.arrayBuffer())
-  }
-  throw new Error('Page trop lourde')
-}
 
 /**
  * Importe un PDF : chaque page est rendue côté client (pdf.js), compressée en JPEG,
@@ -50,18 +35,12 @@ export async function importPdf(store: BoardStore, file: File): Promise<void> {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvas, canvasContext: ctx, viewport }).promise
-    const jpeg = await canvasToJpeg(canvas)
+    const jpeg = await encodeCanvas(canvas, 'image/jpeg', LIMITS.maxAssetBytes)
 
     const pageId = randomId()
     first ??= pageId
     store.send({ t: 'page', action: { a: 'add', id: pageId, name: `${base} p.${n}`, ord: ord++ } })
-    const total = Math.ceil(jpeg.length / CHUNK_BYTES)
-    const assetId = randomId()
-    for (let idx = 0; idx < total; idx++) {
-      const data = toBase64(jpeg.subarray(idx * CHUNK_BYTES, (idx + 1) * CHUNK_BYTES))
-      store.send({ t: 'asset', id: assetId, pageId, mime: 'image/jpeg', w: canvas.width, h: canvas.height, idx, total, data })
-      await sleep(60)
-    }
+    await sendAsset(store, { ...jpeg, w: canvas.width, h: canvas.height }, { pageId, purpose: 'background' })
     // Respecte la limite de débit des actions du prof (création de page).
     await sleep(250)
   }

@@ -73,9 +73,13 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('revert'), seq: z.number().int().nonnegative(), force: z.boolean().optional() }),
   z.object({ t: z.literal('invite'), label: z.string().max(40) }),
   z.object({ t: z.literal('revokeInvite'), id: idSchema }),
-  /** Morceau d'image de fond (base64), envoyé par un admin. */
+  /**
+   * Morceau d'image (base64). `background` : fond de page (admin) ; `element` : image posée
+   * sur le tableau (toute personne qui a la main), référencée ensuite par un élément `image`.
+   */
   z.object({
     t: z.literal('asset'),
+    purpose: z.enum(['background', 'element']).optional(),
     id: idSchema,
     pageId: idSchema,
     mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),

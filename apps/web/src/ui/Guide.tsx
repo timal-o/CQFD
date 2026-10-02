@@ -90,7 +90,8 @@ export function Guide() {
             <dt>Sélection</dt>
             <dd>
               Cliquez sur un élément pour le sélectionner, glissez pour le déplacer, tirez un coin pour le
-              redimensionner, ou tracez un rectangle pour en sélectionner plusieurs. <K>Suppr</K> efface la sélection.
+              redimensionner. Glisser dans le vide <strong>déplace la vue</strong> ; <K>Maj</K> + glisser trace un
+              rectangle pour sélectionner plusieurs éléments. <K>Suppr</K> efface la sélection.
             </dd>
             <dt>Stylo et surligneur</dt>
             <dd>
@@ -123,9 +124,20 @@ export function Guide() {
               Réservé au prof (il peut l’autoriser aux élèves qui ont la main). Maintenez le clic et bougez : tout le
               monde voit un point rouge et une traînée qui s’efface.
             </dd>
+            <dt>Image</dt>
+            <dd>
+              Bouton <strong>Insérer une image</strong>, ou collez-la (<K>Ctrl</K> + <K>V</K>), ou glissez-déposez un
+              fichier sur le tableau. L’image arrive sélectionnée : déplacez-la, redimensionnez-la par un coin, puis
+              annotez par-dessus au stylo. Elle est réduite et compressée automatiquement.
+            </dd>
             <dt>Main</dt>
-            <dd>Déplace la vue. Ctrl + molette ou le pincement zooment.</dd>
+            <dd>Déplace la vue (comme glisser dans le vide avec l’outil Sélection).</dd>
           </dl>
+          <p>
+            <strong>Se déplacer et zoomer :</strong> la <strong>molette</strong> zoome autour du curseur ; glisser dans
+            le vide (outil Sélection), avec la Main, avec le clic molette ou avec <K>Espace</K> + glisser déplace la vue.
+            Un élève en lecture seule se déplace simplement en glissant.
+          </p>
           <p>
             Quand quelqu’un écrit ou pointe hors de votre écran, une <strong>flèche</strong> apparaît au bord avec son
             nom : cliquez dessus pour y aller.
@@ -335,10 +347,8 @@ export function Guide() {
                 <td>déplacer la vue</td>
               </tr>
               <tr>
-                <td>
-                  <K>Ctrl</K> + molette
-                </td>
-                <td>zoomer</td>
+                <td>molette</td>
+                <td>zoomer (Maj + molette : défiler horizontalement)</td>
               </tr>
               <tr>
                 <td>

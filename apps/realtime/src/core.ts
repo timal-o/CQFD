@@ -573,6 +573,14 @@ export class RoomCore {
       }
       case 'chat':
         return this.handleChat(conn, actor, msg.text)
+      case 'asset':
+        // Images posées sur le tableau : toute personne qui a la main. Fonds de page : admin.
+        if (msg.purpose === 'element') {
+          if (!canWrite(actor, this.flags())) return forbidden()
+          return this.handleAsset(conn, msg)
+        }
+        if (actor.role !== 'admin') return forbidden()
+        return this.handleAsset(conn, msg)
       case 'hand':
         if (msg.pid && msg.pid !== actor.id) {
           if (actor.role !== 'admin') return forbidden()
@@ -586,7 +594,6 @@ export class RoomCore {
 
     // Messages réservés aux admins.
     if (actor.role !== 'admin') return forbidden()
-    if (msg.t === 'asset') return this.handleAsset(conn, msg)
     if (!this.take(actor.id, 'admin')) {
       return this.send(conn, { t: 'error', code: 'rate_limited', message: 'Trop d’actions, patientez un instant.' })
     }
@@ -647,6 +654,7 @@ export class RoomCore {
         const ex = lookup(el.id)
         const check = checkPut(actor, flags, el, ex)
         if (!check.ok) return reject(check.reason)
+        if (el.type === 'image' && !this.assetComplete(el.asset)) return reject('Image introuvable : l’envoi a échoué.')
         if (!ex) delta++
         overlay.set(el.id, { authorId: el.authorId, pageId: el.pageId })
       } else {
@@ -882,7 +890,7 @@ export class RoomCore {
       return fail('Enregistrement impossible (quota du jour atteint).')
     }
     const received = Number(this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM assets WHERE id = ?`, msg.id)[0]?.n ?? 0)
-    if (received < msg.total) return
+    if (received < msg.total || msg.purpose === 'element') return
 
     // Image complète : elle devient le fond de la page (l'ancienne est supprimée).
     const page = this.pages().find((p) => p.id === msg.pageId)
@@ -894,6 +902,14 @@ export class RoomCore {
     this.pagesCache = null
     this.pagesCache = null
     this.broadcast({ t: 'pages', pages: this.pages() })
+  }
+
+  private assetComplete(id: string): boolean {
+    const row = this.sql.exec<{ n: number; total: number | null }>(
+      `SELECT COUNT(*) AS n, MAX(total) AS total FROM assets WHERE id = ?`,
+      id,
+    )[0]
+    return !!row && row.n > 0 && row.n === row.total
   }
 
   private deleteAsset(id: string): void {

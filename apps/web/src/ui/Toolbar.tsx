@@ -1,4 +1,6 @@
-import { ChartSpline, Eraser, Hand, Highlighter, Minus, MousePointer2, Pen, Plus, Redo2, Sigma, Target, Trash2, Type, Undo2 } from 'lucide-react'
+import { useRef } from 'react'
+import { ChartSpline, Eraser, Hand, Highlighter, ImagePlus, Minus, MousePointer2, Pen, Plus, Redo2, Sigma, Target, Trash2, Type, Undo2 } from 'lucide-react'
+import { insertImage } from '../lib/imageUpload'
 import type { BoardController } from '../board/controller'
 import { HIGHLIGHTER_COLORS, PEN_COLORS, PEN_SIZES, type BoardStore } from '../board/store'
 import type { Tool } from '../board/types'
@@ -19,6 +21,7 @@ export function Toolbar({ store, controller }: { store: BoardStore; controller: 
   const t = store.tools
   const canWrite = store.canWrite
   const zoom = store.pageId ? store.camera().z : 1
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const zoomBy = (factor: number) => {
     const board = document.querySelector('.board')
@@ -45,6 +48,31 @@ export function Toolbar({ store, controller }: { store: BoardStore; controller: 
           </button>
         ))}
       </div>
+
+      {canWrite && (
+        <div className="tool-group">
+          <button
+            className="tool"
+            onClick={() => fileInput.current?.click()}
+            aria-label="Insérer une image"
+            title="Insérer une image (ou Ctrl+V, ou glisser-déposer)"
+          >
+            <ImagePlus size={20} />
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              const board = document.querySelector('.board')
+              if (file && board) void insertImage(store, file, board.getBoundingClientRect())
+            }}
+          />
+        </div>
+      )}
 
       {canWrite && t.tool === 'pen' && (
         <div className="tool-group">

@@ -25,6 +25,7 @@ import {
 } from './geometry'
 import { HANDLE_SIZE, type Overlay } from './renderer'
 import { recognizeShape, snapLineEnd, type Pt } from './shapes'
+import { firstImage, insertImage } from '../lib/imageUpload'
 import type { BoardStore } from './store'
 import { LASER_TRAIL_MS, MAX_ZOOM, MIN_ZOOM, type Box, type Camera, type LaserPoint } from './types'
 
@@ -131,6 +132,26 @@ export class BoardController {
     on('mousedown', (e) => {
       if (!(e.target as HTMLElement).closest('[data-editor]')) e.preventDefault()
     })
+    // Images : glisser-déposer sur le tableau, ou coller (Ctrl+V).
+    on('dragover', (e) => {
+      if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
+    })
+    on('drop', (e) => {
+      const file = firstImage(e.dataTransfer?.files)
+      if (!file) return
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      void insertImage(this.store, file, r, { x: e.clientX - r.left, y: e.clientY - r.top })
+    })
+    const paste = (e: ClipboardEvent) => {
+      if (isTyping(e.target) || isTyping(document.activeElement)) return
+      const file = firstImage(e.clipboardData?.files)
+      if (!file) return
+      e.preventDefault()
+      void insertImage(this.store, file, el.getBoundingClientRect())
+    }
+    window.addEventListener('paste', paste)
+    this.cleanup.push(() => window.removeEventListener('paste', paste))
     const key = (e: KeyboardEvent) => this.onKey(e)
     window.addEventListener('keydown', key)
     window.addEventListener('keyup', key)
@@ -248,7 +269,11 @@ export class BoardController {
 
     // Rejet de la paume : dès qu'un stylet a été vu, le doigt sert seulement à se déplacer.
     const palm = e.pointerType === 'touch' && this.penSeen
-    if (tool === 'hand' || e.button === 1 || this.spaceDown || palm) {
+    // Sans droit d'écriture, l'outil choisi ne ferait rien : le clic gauche déplace la vue.
+    const writeTool = tool === 'pen' || tool === 'highlighter' || tool === 'eraser' || tool === 'text' || tool === 'formula' || tool === 'graph'
+    const readOnly = (writeTool && !this.store.canWrite) || (tool === 'laser' && !this.store.canLaser)
+    if (readOnly && e.button === 0 && !palm) this.readOnlyHint()
+    if (tool === 'hand' || e.button === 1 || this.spaceDown || palm || readOnly) {
       this.gesture = { kind: 'pan', pointerId: e.pointerId, sx: pos.x, sy: pos.y, cam: { ...this.store.camera() } }
       return
     }
@@ -714,17 +739,36 @@ export class BoardController {
       store.emit()
       return
     }
+    // Dans le vide : glisser déplace la vue ; Maj + glisser trace un rectangle de sélection.
+    if (!e.shiftKey) {
+      if (store.selection.size > 0) {
+        store.selection.clear()
+        store.requestRender('live')
+        store.emit()
+      }
+      this.gesture = { kind: 'pan', pointerId: e.pointerId, sx: pos.x, sy: pos.y, cam: { ...store.camera() } }
+      return
+    }
     this.gesture = {
       kind: 'marquee',
       pointerId: e.pointerId,
       start: w,
       box: { minX: w.x, minY: w.y, maxX: w.x, maxY: w.y },
-      additive: e.shiftKey,
+      additive: true,
     }
-    if (!e.shiftKey && store.selection.size > 0) {
-      store.selection.clear()
-      store.emit()
-    }
+  }
+
+  private hintShown = false
+
+  /** Une seule fois : expliquer à un élève en lecture seule pourquoi le clic déplace la vue. */
+  private readOnlyHint(): void {
+    if (this.hintShown) return
+    this.hintShown = true
+    this.store.toast(
+      this.store.settings.frozen
+        ? 'Le tableau est gelé : glissez pour vous déplacer, la molette zoome.'
+        : 'Lecture seule : glissez pour vous déplacer, la molette zoome. Levez la main pour écrire.',
+    )
   }
 
   private selectedElements(): Map<string, BoardElement> {
@@ -839,15 +883,27 @@ export class BoardController {
 
   // ---------------------------------------------------------------- molette et clavier
 
+  /**
+   * Molette : zoom centré sur le curseur. Un défilement surtout horizontal (pavé tactile)
+   * ou Maj + molette déplace la vue ; le pincement du pavé tactile (Ctrl) zoome finement.
+   */
   private onWheel(e: WheelEvent): void {
     e.preventDefault()
     const pos = this.local(e)
+    const k = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1
+    const dx = e.deltaX * k
+    const dy = e.deltaY * k
     if (e.ctrlKey || e.metaKey) {
-      this.zoomAt(pos.x, pos.y, Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.01)))
-    } else {
+      this.zoomAt(pos.x, pos.y, Math.exp(-dy * 0.01))
+    } else if (e.shiftKey || Math.abs(dx) > Math.abs(dy)) {
       const cam = this.store.camera()
-      const k = e.deltaMode === 1 ? 16 : 1
-      this.store.setCamera({ ...cam, x: cam.x - e.deltaX * k, y: cam.y - e.deltaY * k })
+      // Maj + molette : la molette verticale devient un défilement horizontal.
+      const sx = e.shiftKey && dx === 0 ? dy : dx
+      const sy = e.shiftKey && dx === 0 ? 0 : dy
+      this.store.setCamera({ ...cam, x: cam.x - sx, y: cam.y - sy })
+    } else {
+      // Un cran de molette (≈ 100) zoome d'environ 15 %.
+      this.zoomAt(pos.x, pos.y, Math.exp(-Math.max(-300, Math.min(300, dy)) * 0.0015))
     }
   }
 

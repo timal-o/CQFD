@@ -92,7 +92,16 @@ export const graphSchema = z
   })
   .refine((g) => g.xmin < g.xmax && g.ymin < g.ymax, 'fenêtre invalide')
 
-export const elementSchema = z.union([strokeSchema, textSchema, formulaSchema, graphSchema])
+/** Image posée sur le tableau ; le fichier est stocké dans la salle (comme les fonds PDF). */
+export const imageSchema = z.object({
+  ...base,
+  type: z.literal('image'),
+  w: z.number().min(4).max(10_000),
+  h: z.number().min(4).max(10_000),
+  asset: idSchema,
+})
+
+export const elementSchema = z.union([strokeSchema, textSchema, formulaSchema, graphSchema, imageSchema])
 
 export type StrokeElement = z.infer<typeof strokeSchema>
 export type TextRun = z.infer<typeof textRunSchema>
@@ -101,7 +110,8 @@ export type TextElement = z.infer<typeof textSchema>
 export type FormulaElement = z.infer<typeof formulaSchema>
 export type Curve = z.infer<typeof curveSchema>
 export type GraphElement = z.infer<typeof graphSchema>
-export type BoardElement = StrokeElement | TextElement | FormulaElement | GraphElement
+export type ImageElement = z.infer<typeof imageSchema>
+export type BoardElement = StrokeElement | TextElement | FormulaElement | GraphElement | ImageElement
 export type ElementType = BoardElement['type']
 
 export const PAGE_BACKGROUNDS = ['blank', 'seyes', 'grid', 'dots', 'dark'] as const

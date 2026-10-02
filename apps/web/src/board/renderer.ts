@@ -89,10 +89,19 @@ export class BoardRenderer {
     const view = viewportBox(cam, this.width, this.height)
     let mathMissing = false
     for (const el of this.store.pageElements()) {
-      if (el.type !== 'stroke' && el.type !== 'graph') continue
+      if (el.type !== 'stroke' && el.type !== 'graph' && el.type !== 'image') continue
       if (!intersects(view, elementBox(el, this.store.domSizes))) continue
       if (el.type === 'stroke') {
         paintStroke(ctx, el, bg)
+      } else if (el.type === 'image') {
+        const img = this.image(el.asset)
+        if (img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, el.x, el.y, el.w, el.h)
+        } else {
+          // Image en cours de chargement : un cadre discret à sa place.
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.15)'
+          ctx.fillRect(el.x, el.y, el.w, el.h)
+        }
       } else {
         drawGraph(ctx, el, bg, (curve) => {
           const s = curveSamples(el, curve)

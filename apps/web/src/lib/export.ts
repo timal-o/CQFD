@@ -107,8 +107,17 @@ export async function renderPage(store: BoardStore, page: Page): Promise<{ canva
     if (img) ctx.drawImage(img, 0, 0, page.image.w, page.image.h)
   }
   if (elements.some((e) => e.type === 'graph')) await loadMath()
+  const images = new Map<string, HTMLImageElement | null>()
   for (const el of elements) {
-    if (el.type === 'stroke') paintStroke(ctx, el, page.bg)
+    if (el.type === 'image' && !images.has(el.asset)) {
+      images.set(el.asset, await loadImage(`/api/rooms/${store.code}/assets/${el.asset}`))
+    }
+  }
+  for (const el of elements) {
+    if (el.type === 'image') {
+      const img = images.get(el.asset)
+      if (img) ctx.drawImage(img, el.x, el.y, el.w, el.h)
+    } else if (el.type === 'stroke') paintStroke(ctx, el, page.bg)
     else if (el.type === 'graph') drawGraph(ctx, el, page.bg, (c) => curveSamples(el, c))
   }
   await drawDomElements(ctx, elements, box, scale, page.bg === 'dark')

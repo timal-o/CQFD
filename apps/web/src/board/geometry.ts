@@ -69,7 +69,7 @@ function estimateSize(el: TextElement | FormulaElement): DomSize {
 
 export function elementBox(el: BoardElement, domSizes: Map<string, DomSize>): Box {
   if (el.type === 'stroke') return strokeBox(el)
-  if (el.type === 'graph') return { minX: el.x, minY: el.y, maxX: el.x + el.w, maxY: el.y + el.h }
+  if (el.type === 'graph' || el.type === 'image') return { minX: el.x, minY: el.y, maxX: el.x + el.w, maxY: el.y + el.h }
   const measured = domSizes.get(el.id) ?? estimateSize(el)
   const w = el.type === 'text' ? el.w : measured.w
   return { minX: el.x, minY: el.y, maxX: el.x + w, maxY: el.y + measured.h }
@@ -140,6 +140,11 @@ export function scaleElement(el: BoardElement, ox: number, oy: number, s: number
   }
   if (el.type === 'formula') return { ...el, x, y, fs: clamp(round(el.fs * s), 8, 200) }
   if (el.type === 'graph') return { ...el, x, y, w: clamp(round(el.w * s), 60, 5000), h: clamp(round(el.h * s), 60, 5000) }
+  if (el.type === 'image') {
+    // Même facteur sur les deux côtés : l'image garde ses proportions.
+    const k = clamp(s, 4 / Math.min(el.w, el.h), 10_000 / Math.max(el.w, el.h))
+    return { ...el, x: round(ox + (el.x - ox) * k), y: round(oy + (el.y - oy) * k), w: round(el.w * k), h: round(el.h * k) }
+  }
   return { ...el, x, y, w: clamp(round(el.w * s), 20, 5000), fs: clamp(round(el.fs * s), 8, 200) }
 }
 
