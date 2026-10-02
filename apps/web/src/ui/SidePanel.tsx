@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { LIMITS, type ParticipantInfo } from '@cqfd/shared'
 import { Hand, MoreHorizontal, Send, Undo2, X } from 'lucide-react'
 import type { BoardStore } from '../board/store'
+import { Popover } from './Popover'
 
 export type PanelTab = 'people' | 'chat' | 'log'
 
@@ -124,14 +125,8 @@ function People({ store }: { store: BoardStore }) {
 }
 
 function Person({ store, p }: { store: BoardStore; p: ParticipantInfo }) {
-  const [menu, setMenu] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!menu) return
-    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setMenu(false)
-    window.addEventListener('pointerdown', close)
-    return () => window.removeEventListener('pointerdown', close)
-  }, [menu])
+  const [menu, setMenu] = useState<DOMRect | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
 
   const adminActions = store.isAdmin && p.role !== 'admin'
   return (
@@ -156,15 +151,18 @@ function Person({ store, p }: { store: BoardStore; p: ParticipantInfo }) {
           <button className="small" onClick={() => store.send({ t: 'grant', pid: p.id, on: !p.canWrite })}>
             {p.canWrite ? 'Retirer la main' : 'Donner la main'}
           </button>
-          <div className="menu-wrap" ref={ref}>
-            <button className="icon" onClick={() => setMenu((m) => !m)} aria-label={`Actions pour ${p.name}`}>
-              <MoreHorizontal size={16} />
-            </button>
-            {menu && (
-              <div className="menu" role="menu">
+          <button
+            className="icon person-more"
+            onClick={(e) => setMenu(menu ? null : e.currentTarget.getBoundingClientRect())}
+            aria-label={`Actions pour ${p.name}`}
+            aria-expanded={menu !== null}
+          >
+            <MoreHorizontal size={16} />
+          </button>
+          {menu && (
+            <Popover anchor={menu} onClose={closeMenu} ignore=".person-more">
                 <button
                   onClick={() => {
-                    setMenu(false)
                     if (confirm(`Exclure ${p.name} ? Il ne pourra pas revenir avec le même onglet.`)) {
                       store.send({ t: 'kick', pid: p.id })
                     }
@@ -175,7 +173,6 @@ function Person({ store, p }: { store: BoardStore; p: ParticipantInfo }) {
                 <button
                   className="danger"
                   onClick={() => {
-                    setMenu(false)
                     if (
                       confirm(
                         `Bannir ${p.name} ? Son adresse IP sera aussi bloquée : d’autres élèves sur le même Wi-Fi pourraient ne plus pouvoir entrer. Vous pourrez lever le ban.`,
@@ -187,9 +184,8 @@ function Person({ store, p }: { store: BoardStore; p: ParticipantInfo }) {
                 >
                   Bannir (IP)
                 </button>
-              </div>
-            )}
-          </div>
+            </Popover>
+          )}
         </>
       )}
     </li>

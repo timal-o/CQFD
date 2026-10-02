@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { LIMITS, PAGE_BACKGROUNDS, randomId, type Page, type PageBackground } from '@cqfd/shared'
 import { FileUp, MoreHorizontal, Plus } from 'lucide-react'
 import type { BoardStore } from '../board/store'
 import { importPdf } from '../lib/pdfImport'
+import { Popover } from './Popover'
 
 const BG_LABELS: Record<PageBackground, string> = {
   blank: 'Blanc',
@@ -16,6 +16,7 @@ const BG_LABELS: Record<PageBackground, string> = {
 export function PageTabs({ store }: { store: BoardStore }) {
   const [renaming, setRenaming] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ pageId: string; anchor: DOMRect } | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
   const pages = store.pages
   const admin = store.isAdmin
 
@@ -88,7 +89,7 @@ export function PageTabs({ store }: { store: BoardStore }) {
                   <MoreHorizontal size={16} />
                 </button>
                 {menu?.pageId === p.id && (
-                  <PageMenu anchor={menu.anchor} onClose={() => setMenu(null)}>
+                  <Popover anchor={menu.anchor} onClose={closeMenu} ignore=".tab-more">
                     <button onClick={() => setRenaming(p.id)}>Renommer</button>
                     <button onClick={() => duplicate(p, i)}>Dupliquer</button>
                     <button disabled={i === 0} onClick={() => move(p, i, -1)}>
@@ -119,7 +120,7 @@ export function PageTabs({ store }: { store: BoardStore }) {
                     >
                       Supprimer la page
                     </button>
-                  </PageMenu>
+                  </Popover>
                 )}
               </div>
             )}
@@ -173,48 +174,5 @@ function RenameInput({ initial, onDone }: { initial: string; onDone: (name: stri
         if (e.key === 'Escape') onDone(initial)
       }}
     />
-  )
-}
-
-const MENU_WIDTH = 210
-
-/**
- * Menu d'une page. Rendu dans <body> en position fixe : la barre d'onglets défile
- * horizontalement et couperait un menu positionné à l'intérieur.
- */
-function PageMenu({ anchor, children, onClose }: { anchor: DOMRect; children: React.ReactNode; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const close = (e: PointerEvent) => {
-      const target = e.target as Element
-      // Le bouton « ⋯ » gère lui-même l'ouverture et la fermeture.
-      if (!ref.current?.contains(target) && !target.closest?.('.tab-more')) onClose()
-    }
-    const closeOnKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('pointerdown', close)
-    window.addEventListener('keydown', closeOnKey)
-    window.addEventListener('resize', onClose)
-    return () => {
-      window.removeEventListener('pointerdown', close)
-      window.removeEventListener('keydown', closeOnKey)
-      window.removeEventListener('resize', onClose)
-    }
-  }, [onClose])
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: 'auto',
-    right: 'auto',
-    left: Math.max(8, Math.min(anchor.left, window.innerWidth - MENU_WIDTH - 8)),
-    bottom: window.innerHeight - anchor.top + 6,
-    minWidth: MENU_WIDTH,
-    maxHeight: Math.max(160, anchor.top - 16),
-    overflowY: 'auto',
-    zIndex: 60,
-  }
-  return createPortal(
-    <div ref={ref} className="menu" style={style} role="menu" onClick={(e) => (e.target as HTMLElement).tagName === 'BUTTON' && onClose()}>
-      {children}
-    </div>,
-    document.body,
   )
 }
