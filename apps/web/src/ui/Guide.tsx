@@ -93,7 +93,13 @@ export function Guide() {
               redimensionner, ou tracez un rectangle pour en sélectionner plusieurs. <K>Suppr</K> efface la sélection.
             </dd>
             <dt>Stylo et surligneur</dt>
-            <dd>Trois épaisseurs, plusieurs couleurs. Avec un stylet, le trait suit la pression.</dd>
+            <dd>
+              Trois épaisseurs, plusieurs couleurs. Avec un stylet, le trait suit la pression. Maintenez{' '}
+              <K>Maj</K> pour tracer un <strong>trait droit</strong> (il se cale sur l’horizontale, la verticale ou 45°).
+              Pour une <strong>forme propre</strong>, dessinez-la à main levée (cercle, ellipse, rectangle, triangle,
+              trait) puis <strong>restez immobile une demi-seconde</strong> avant de lever le stylo : elle est
+              remplacée par une forme nette.
+            </dd>
             <dt>Gomme</dt>
             <dd>
               Mode <strong>Trait</strong> : efface un trait entier d’un simple passage. Mode <strong>Pixel</strong> :

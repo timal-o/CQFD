@@ -68,6 +68,7 @@ Aucun secret n'est nécessaire : les jetons admin sont générés par salle, et 
   - import d'un PDF en fond (une page de PDF par page du tableau).
 - **Outils** :
   - stylo sensible à la pression, surligneur, gomme par trait ou pixel ;
+  - trait droit avec Maj, formes propres (cercle, ellipse, rectangle, triangle) en restant immobile à la fin du geste ;
   - texte formaté, formule (KaTeX/MathLive), repère avec courbes y = f(x) ;
   - sélection, déplacement, redimensionnement, laser.
 - **Maths** :

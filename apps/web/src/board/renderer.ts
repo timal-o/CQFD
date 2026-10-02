@@ -1,12 +1,12 @@
 import { elementBox, intersects, viewportBox, worldToScreen } from './geometry'
 import { curveSamples, loadMath } from '../math/curves'
-import { buildStrokePath, drawBackground, drawGraph, fillStroke, inkColor, strokePath } from './render'
+import { buildPolyline, buildStrokePath, drawBackground, drawGraph, fillStroke, inkColor, paintStroke, strokeGeo } from './render'
 import type { BoardStore, RenderKind } from './store'
 import { LASER_TRAIL_MS, type Box, type LaserPoint } from './types'
 
 /** Ce que le contrôleur veut voir dessiné sur le calque actif. */
 export interface Overlay {
-  current: { tool: 'pen' | 'highlighter'; color: string; size: number; pts: number[] } | null
+  current: { tool: 'pen' | 'highlighter'; color: string; size: number; pts: number[]; geo: boolean } | null
   ownLaser: LaserPoint[]
   marquee: Box | null
   cursor: { x: number; y: number; radius: number; kind: 'eraser' | 'laser' } | null
@@ -92,7 +92,7 @@ export class BoardRenderer {
       if (el.type !== 'stroke' && el.type !== 'graph') continue
       if (!intersects(view, elementBox(el, this.store.domSizes))) continue
       if (el.type === 'stroke') {
-        fillStroke(ctx, strokePath(el), el.tool, el.color, bg)
+        paintStroke(ctx, el, bg)
       } else {
         drawGraph(ctx, el, bg, (curve) => {
           const s = curveSamples(el, curve)
@@ -147,7 +147,8 @@ export class BoardRenderer {
     // Mon tracé en cours.
     if (ov.current && ov.current.pts.length >= 3) {
       const c = ov.current
-      fillStroke(ctx, buildStrokePath(c.tool, c.size, c.pts, false), c.tool, c.color, bg)
+      if (c.geo) strokeGeo(ctx, buildPolyline(c.pts), c.tool, c.color, c.size, bg)
+      else fillStroke(ctx, buildStrokePath(c.tool, c.size, c.pts, false), c.tool, c.color, bg)
     }
 
     // Lasers (le mien et ceux reçus).

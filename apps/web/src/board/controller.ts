@@ -24,6 +24,7 @@ import {
   worldToScreen,
 } from './geometry'
 import { HANDLE_SIZE, type Overlay } from './renderer'
+import { recognizeShape, snapLineEnd, type Pt } from './shapes'
 import type { BoardStore } from './store'
 import { LASER_TRAIL_MS, MAX_ZOOM, MIN_ZOOM, type Box, type Camera, type LaserPoint } from './types'
 
@@ -36,9 +37,18 @@ type Gesture =
       tool: 'pen' | 'highlighter'
       color: string
       size: number
+      /** Points affichés et enregistrés (tracé libre, trait droit ou forme propre). */
       pts: number[]
+      /** Tous les points saisis, pour revenir au tracé libre ou reconnaître une forme. */
+      raw: number[]
       unsent: number[]
       lastSend: number
+      /** Trait droit (Maj enfoncée). */
+      straight: boolean
+      /** Forme reconnue après un temps d'arrêt : le tracé est figé. */
+      snapped: boolean
+      holdTimer: ReturnType<typeof setTimeout> | undefined
+      holdAnchor: { x: number; y: number }
     }
   | {
       kind: 'erase'
@@ -66,6 +76,9 @@ type Gesture =
   | { kind: 'laser'; pointerId: number; unsent: number[]; lastSend: number }
 
 const ERASER_RADIUS = { stroke: 8, pixel: 12 }
+/** Immobilité (ms et px écran) qui déclenche la reconnaissance de forme. */
+const HOLD_MS = 550
+const HOLD_TOLERANCE = 4
 const MAX_STROKE_TRIPLETS = Math.floor(LIMITS.maxStrokeNumbers / 3) - 10
 
 const isTyping = (target: EventTarget | null) =>
@@ -152,7 +165,7 @@ export class BoardController {
     }
     return {
       current:
-        g?.kind === 'draw' ? { tool: g.tool, color: g.color, size: g.size, pts: g.pts } : null,
+        g?.kind === 'draw' ? { tool: g.tool, color: g.color, size: g.size, pts: g.pts, geo: g.straight || g.snapped } : null,
       ownLaser: this.ownLaser.filter((p) => performance.now() - p.t < LASER_TRAIL_MS),
       marquee: g?.kind === 'marquee' ? g.box : null,
       cursor,
@@ -274,9 +287,15 @@ export class BoardController {
           // L'épaisseur suit le zoom pour rester constante à l'écran.
           size: Math.round(((tool === 'pen' ? t.penSize : t.hlSize) / z) * 10) / 10,
           pts: [w.x, w.y, this.pressure(e)],
+          raw: [w.x, w.y, this.pressure(e)],
           unsent: [w.x, w.y, this.pressure(e)],
           lastSend: 0,
+          straight: e.shiftKey,
+          snapped: false,
+          holdTimer: undefined,
+          holdAnchor: pos,
         }
+        this.armHold(this.gesture)
         this.store.requestRender('live')
         return
       }
@@ -329,13 +348,23 @@ export class BoardController {
         this.store.setCamera({ ...g.cam, x: g.cam.x + pos.x - g.sx, y: g.cam.y + pos.y - g.sy })
         return
       case 'draw': {
+        // Forme reconnue : le tracé est figé jusqu'au relâchement.
+        if (g.snapped) return
         const events = e.getCoalescedEvents?.() ?? [e]
         const r = this.el.getBoundingClientRect()
         for (const ev of events.length > 0 ? events : [e]) {
           const p = screenToWorld(cam, ev.clientX - r.left, ev.clientY - r.top)
           const pr = this.pressure(ev)
-          g.pts.push(p.x, p.y, pr)
+          g.raw.push(p.x, p.y, pr)
           g.unsent.push(p.x, p.y, pr)
+          if (!g.straight) g.pts.push(p.x, p.y, pr)
+        }
+        g.straight = e.shiftKey
+        this.applyStraight(g)
+        // Le geste bouge encore : on relance le délai de reconnaissance de forme.
+        if (Math.hypot(pos.x - g.holdAnchor.x, pos.y - g.holdAnchor.y) > HOLD_TOLERANCE) {
+          g.holdAnchor = pos
+          this.armHold(g)
         }
         const now = performance.now()
         if (now - g.lastSend >= SEND_INTERVALS.live) this.flushLive(g, now)
@@ -396,6 +425,7 @@ export class BoardController {
     }
     if (g.pointerId !== e.pointerId) return
     this.gesture = null
+    if (g.kind === 'draw') clearTimeout(g.holdTimer)
     if (cancelled && g.kind === 'draw') {
       this.store.send({ t: 'live', id: g.id, pageId: this.store.pageId!, tool: g.tool, color: g.color, size: g.size, pts: [], end: true })
       this.store.requestRender('live')
@@ -449,6 +479,7 @@ export class BoardController {
     this.gesture = null
     if (!g) return
     if (g.kind === 'draw') {
+      clearTimeout(g.holdTimer)
       this.store.send({ t: 'live', id: g.id, pageId: this.store.pageId!, tool: g.tool, color: g.color, size: g.size, pts: [], end: true })
     } else if (g.kind === 'erase') {
       this.finishErase(g)
@@ -475,11 +506,52 @@ export class BoardController {
     g.lastSend = now
   }
 
+  /** Maj : le tracé devient un trait droit du point de départ au point courant (et inversement). */
+  private applyStraight(g: Extract<Gesture, { kind: 'draw' }>): void {
+    if (g.snapped) return
+    if (g.straight) {
+      const n = g.raw.length
+      const end = snapLineEnd([g.raw[0]!, g.raw[1]!], [g.raw[n - 3]!, g.raw[n - 2]!])
+      g.pts = [g.raw[0]!, g.raw[1]!, 0.5, end[0], end[1], 0.5]
+    } else if (g.pts.length !== g.raw.length) {
+      g.pts = g.raw.slice()
+    }
+  }
+
+  /** Arme le délai au bout duquel un geste immobile est remplacé par une forme propre. */
+  private armHold(g: Extract<Gesture, { kind: 'draw' }>): void {
+    clearTimeout(g.holdTimer)
+    g.holdTimer = setTimeout(() => this.snapShape(g), HOLD_MS)
+  }
+
+  private snapShape(g: Extract<Gesture, { kind: 'draw' }>): void {
+    if (this.gesture !== g || g.snapped || g.straight) return
+    const pts: Pt[] = []
+    for (let i = 0; i < g.raw.length; i += 3) pts.push([g.raw[i]!, g.raw[i + 1]!])
+    const shape = recognizeShape(pts)
+    if (!shape) return
+    g.snapped = true
+    g.pts = shape.points.flatMap(([x, y]) => [x, y, 0.5])
+    this.store.requestRender('live')
+  }
+
   private finishStroke(g: Extract<Gesture, { kind: 'draw' }>): void {
+    clearTimeout(g.holdTimer)
     const store = this.store
     const me = store.me
     if (!me || !store.pageId) return
     const z = store.camera().z
+    const geo = g.straight || g.snapped
+    if (geo && g.pts.length >= 6) {
+      const el = makeStroke(
+        { id: g.id, pageId: store.pageId, authorId: me.id, z: store.nextZ(), tool: g.tool, color: g.color, size: g.size },
+        g.pts,
+      )
+      store.commit([{ o: 'put', el: { ...el, geo: true } }])
+      store.send({ t: 'live', id: g.id, pageId: store.pageId, tool: g.tool, color: g.color, size: g.size, pts: [], end: true })
+      store.requestRender('live')
+      return
+    }
     let pts = simplify(g.pts, 0.6 / z)
     const ops: Op[] = []
     let zIndex = store.nextZ()
@@ -780,6 +852,13 @@ export class BoardController {
   }
 
   private onKey(e: KeyboardEvent): void {
+    // Maj pendant un tracé : bascule trait droit / tracé libre sans attendre un mouvement.
+    if (e.key === 'Shift' && this.gesture?.kind === 'draw') {
+      this.gesture.straight = e.type === 'keydown'
+      this.applyStraight(this.gesture)
+      this.store.requestRender('live')
+      return
+    }
     if (e.key === ' ' && !isTyping(e.target)) {
       this.spaceDown = e.type === 'keydown'
       if (e.type === 'keydown') e.preventDefault()

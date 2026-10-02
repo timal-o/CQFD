@@ -28,6 +28,8 @@ export const strokeSchema = z.object({
     .min(3)
     .max(LIMITS.maxStrokeNumbers)
     .refine((a) => a.length % 3 === 0, 'triplets attendus'),
+  /** Tracé géométrique (trait droit, forme reconnue) : largeur constante, coins nets. */
+  geo: z.literal(true).optional(),
 })
 
 export const textRunSchema = z.object({

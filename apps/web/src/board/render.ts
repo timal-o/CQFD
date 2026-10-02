@@ -50,16 +50,52 @@ export function buildStrokePath(
   return outlineToPath(getStroke(points, outlineOptions(tool, size, !hasRealPressure(absolute), last)))
 }
 
+/** Polyligne simple (tracés géométriques), points absolus (x, y, pression). */
+export function buildPolyline(absolute: number[]): Path2D {
+  const path = new Path2D()
+  for (let i = 0; i < absolute.length; i += 3) {
+    if (i === 0) path.moveTo(absolute[0]!, absolute[1]!)
+    else path.lineTo(absolute[i]!, absolute[i + 1]!)
+  }
+  return path
+}
+
 const pathCache = new WeakMap<StrokeElement, Path2D>()
 
 export function strokePath(el: StrokeElement): Path2D {
   let path = pathCache.get(el)
   if (!path) {
     const abs = el.pts.map((v, i) => (i % 3 === 0 ? v + el.x : i % 3 === 1 ? v + el.y : v))
-    path = buildStrokePath(el.tool, el.size, abs, true)
+    path = el.geo ? buildPolyline(abs) : buildStrokePath(el.tool, el.size, abs, true)
     pathCache.set(el, path)
   }
   return path
+}
+
+/** Trace une polyligne géométrique : largeur constante, coins nets. */
+export function strokeGeo(
+  ctx: CanvasRenderingContext2D,
+  path: Path2D,
+  tool: 'pen' | 'highlighter',
+  color: string,
+  size: number,
+  bg: PageBackground,
+): void {
+  ctx.globalAlpha = tool === 'highlighter' ? 0.35 : 1
+  ctx.strokeStyle = inkColor(color, bg)
+  // Un peu plus fin que la taille nominale : le tracé libre s'affine avec la vitesse.
+  ctx.lineWidth = tool === 'highlighter' ? size : size * 0.75
+  ctx.lineCap = 'round'
+  ctx.lineJoin = tool === 'highlighter' ? 'round' : 'miter'
+  ctx.miterLimit = 4
+  ctx.stroke(path)
+  ctx.globalAlpha = 1
+}
+
+/** Dessine un élément trait, à main levée ou géométrique. */
+export function paintStroke(ctx: CanvasRenderingContext2D, el: StrokeElement, bg: PageBackground): void {
+  if (el.geo) strokeGeo(ctx, strokePath(el), el.tool, el.color, el.size, bg)
+  else fillStroke(ctx, strokePath(el), el.tool, el.color, bg)
 }
 
 function isDarkColor(hex: string): boolean {

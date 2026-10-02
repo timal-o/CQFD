@@ -1,6 +1,6 @@
 import type { BoardElement, Page } from '@cqfd/shared'
 import { elementBox, unionBox } from '../board/geometry'
-import { drawBackground, drawGraph, fillStroke, inkColor, strokePath } from '../board/render'
+import { drawBackground, drawGraph, inkColor, paintStroke } from '../board/render'
 import { fillEditor } from '../board/richtext'
 import type { BoardStore } from '../board/store'
 import type { Box } from '../board/types'
@@ -108,7 +108,7 @@ export async function renderPage(store: BoardStore, page: Page): Promise<{ canva
   }
   if (elements.some((e) => e.type === 'graph')) await loadMath()
   for (const el of elements) {
-    if (el.type === 'stroke') fillStroke(ctx, strokePath(el), el.tool, el.color, page.bg)
+    if (el.type === 'stroke') paintStroke(ctx, el, page.bg)
     else if (el.type === 'graph') drawGraph(ctx, el, page.bg, (c) => curveSamples(el, c))
   }
   await drawDomElements(ctx, elements, box, scale, page.bg === 'dark')
