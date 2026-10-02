@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { LIMITS } from '@cqfd/shared'
-import { Download, Hand, Lock, MessageSquare, Settings, Share2, Snowflake, Users } from 'lucide-react'
+import { CircleHelp, Download, Hand, Lock, MessageSquare, Settings, Share2, Snowflake, Users } from 'lucide-react'
 import type { BoardStore } from '../board/store'
 import { exportPdf, exportPng } from '../lib/export'
 import type { PanelTab } from './SidePanel'
@@ -68,6 +68,9 @@ export function TopBar({
           </label>
         )}
         <ExportMenu store={store} />
+        <a className="chip" href="/guide" target="_blank" rel="noopener" title="Guide (nouvel onglet)" aria-label="Guide">
+          <CircleHelp size={16} />
+        </a>
         {store.isAdmin && <RoomSettingsMenu store={store} />}
         <button className="chip" onClick={() => onPanel('chat')} title="Chat" aria-label={`Chat, ${store.unreadChat} non lus`}>
           <MessageSquare size={16} />

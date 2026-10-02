@@ -3,6 +3,7 @@ import { CODE_LENGTH, isValidCode, LIMITS, normalizeCode, sanitizeName } from '@
 import { createRoom } from '../lib/api'
 import { session } from '../lib/session'
 import { navigate } from './router'
+import { SiteFooter, SiteHeader } from './SiteHeader'
 
 export function Home() {
   const [code, setCode] = useState('')
@@ -37,75 +38,79 @@ export function Home() {
   }
 
   return (
-    <main className="home">
-      <header className="home-header">
-        <h1 className="logo">
-          CQFD<span className="qed" aria-hidden>∎</span>
-        </h1>
-        <p>Ce Qu’il Faut Démontrer : le tableau blanc de maths de la classe, en temps réel.</p>
-      </header>
+    <div className="doc-layout">
+      <SiteHeader />
+      <main className="home">
+        <header className="home-header">
+          <h1 className="logo">
+            CQFD<span className="qed" aria-hidden>∎</span>
+          </h1>
+          <p>Ce Qu’il Faut Démontrer : le tableau blanc de maths de la classe, en temps réel.</p>
+        </header>
 
-      <div className="home-cards">
-        <form className="card" onSubmit={join}>
-          <h2>Rejoindre un tableau</h2>
-          <label>
-            Code de la salle
-            <input
-              className="code-input"
-              value={code}
-              onChange={(e) => setCode(normalizeCode(e.target.value).slice(0, CODE_LENGTH))}
-              placeholder="ABC234"
-              autoComplete="off"
-              autoCapitalize="characters"
-              spellCheck={false}
-              inputMode="text"
-              required
-            />
-          </label>
-          <label>
-            Votre prénom
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={LIMITS.nameMaxLength}
-              autoComplete="off"
-              required
-            />
-          </label>
-          <button className="primary" type="submit">
-            Rejoindre
-          </button>
-        </form>
+        <div className="home-cards">
+          <form className="card" onSubmit={join}>
+            <h2>Rejoindre un tableau</h2>
+            <label>
+              Code de la salle
+              <input
+                className="code-input"
+                value={code}
+                onChange={(e) => setCode(normalizeCode(e.target.value).slice(0, CODE_LENGTH))}
+                placeholder="ABC234"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                inputMode="text"
+                required
+              />
+            </label>
+            <label>
+              Votre prénom
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={LIMITS.nameMaxLength}
+                autoComplete="off"
+                required
+              />
+            </label>
+            <button className="primary" type="submit">
+              Rejoindre
+            </button>
+          </form>
 
-        <div className="card">
-          <h2>Créer un tableau</h2>
-          <p className="muted">Pour le professeur. Pas de compte : vous recevez un code pour la classe et un lien administrateur secret.</p>
-          <label>
-            Votre nom (affiché aux élèves)
-            <input
-              value={profName}
-              onChange={(e) => setProfName(e.target.value)}
-              maxLength={LIMITS.nameMaxLength}
-              placeholder="Professeur"
-              autoComplete="off"
-            />
-          </label>
-          <button className="primary" type="button" onClick={create} disabled={busy}>
-            {busy ? 'Création…' : 'Créer un tableau'}
-          </button>
+          <div className="card">
+            <h2>Créer un tableau</h2>
+            <p className="muted">Pour le professeur. Pas de compte : vous recevez un code pour la classe et un lien administrateur secret.</p>
+            <label>
+              Votre nom (affiché aux élèves)
+              <input
+                value={profName}
+                onChange={(e) => setProfName(e.target.value)}
+                maxLength={LIMITS.nameMaxLength}
+                placeholder="Professeur"
+                autoComplete="off"
+              />
+            </label>
+            <button className="primary" type="button" onClick={create} disabled={busy}>
+              {busy ? 'Création…' : 'Créer un tableau'}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
 
-      <footer className="home-footer">
-        Aucun compte, aucun cookie, aucune statistique. Seul le prénom saisi est conservé, le temps de la séance :
-        tout est effacé quand la salle se vide.
-      </footer>
-    </main>
+        <footer className="home-footer">
+          Aucun compte, aucun cookie, aucune statistique. Seul le prénom saisi est conservé, le temps de la séance :
+          tout est effacé quand la salle se vide.
+        </footer>
+      </main>
+      <SiteFooter />
+    </div>
   )
 }
