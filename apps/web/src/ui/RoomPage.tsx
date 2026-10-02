@@ -6,10 +6,12 @@ import { OffscreenIndicators } from '../board/OffscreenIndicators'
 import { BoardStore } from '../board/store'
 import { captureAdminFragment, session } from '../lib/session'
 import { FormulaEditor } from '../math/FormulaEditor'
+import { GraphEditor } from '../math/GraphEditor'
 import { PageTabs } from './PageTabs'
-import { ParticipantsPanel } from './ParticipantsPanel'
 import { navigate } from './router'
 import { ShareDialog } from './ShareDialog'
+import { SidePanel, type PanelTab } from './SidePanel'
+import { QuotaBanner } from './QuotaBanner'
 import { TextToolbar } from './TextToolbar'
 import { Toolbar } from './Toolbar'
 import { TopBar } from './TopBar'
@@ -80,7 +82,8 @@ function Room({ code, name }: { code: string; name: string }) {
   const [controller, setController] = useState<BoardController | null>(null)
   const onController = useCallback((c: BoardController | null) => setController(c), [])
   const [shareOpen, setShareOpen] = useState(() => session.takeShare(code))
-  const [peopleOpen, setPeopleOpen] = useState(false)
+  const [panel, setPanel] = useState<PanelTab | null>(null)
+  const togglePanel = (tab: PanelTab) => setPanel((cur) => (cur === tab ? null : tab))
 
   // Pas de sauvegarde : on prévient le prof avant de fermer l'onglet.
   useEffect(() => {
@@ -115,7 +118,7 @@ function Room({ code, name }: { code: string; name: string }) {
 
   return (
     <div className="room">
-      <TopBar store={store} onShare={() => setShareOpen(true)} onPeople={() => setPeopleOpen((v) => !v)} />
+      <TopBar store={store} onShare={() => setShareOpen(true)} onPanel={togglePanel} />
       <div className="room-main">
         {store.me ? <Board store={store} onController={onController} /> : <div className="board loading">Connexion…</div>}
         {store.me && <OffscreenIndicators store={store} />}
@@ -124,7 +127,11 @@ function Room({ code, name }: { code: string; name: string }) {
         {store.editingId && store.elements.get(store.editingId)?.type === 'formula' && (
           <FormulaEditor key={store.editingId} store={store} />
         )}
-        {peopleOpen && <ParticipantsPanel store={store} onClose={() => setPeopleOpen(false)} />}
+        {store.editingId && store.elements.get(store.editingId)?.type === 'graph' && (
+          <GraphEditor key={store.editingId} store={store} />
+        )}
+        {panel && <SidePanel store={store} tab={panel} onTab={setPanel} onClose={() => setPanel(null)} />}
+        <QuotaBanner store={store} />
         {store.status === 'reconnecting' && <div className="banner">Connexion perdue, reconnexion…</div>}
         <div className="toasts" aria-live="polite">
           {store.toasts.map((t) => (

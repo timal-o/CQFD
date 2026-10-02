@@ -59,6 +59,7 @@ export function ShareDialog({ store, onClose }: { store: BoardStore; onClose: ()
         {store.isAdmin && token && (
           <>
             <CopyField label="Lien administrateur (secret)" value={adminUrl(store.code, token)} secret />
+            <CoAdmins store={store} />
             <p className="warning">
               Ce lien donne les droits de professeur : ne le partagez qu’avec un collègue de confiance. Il n’y a{' '}
               <strong>aucune sauvegarde</strong> : exportez votre travail avant de partir, la salle est effacée quand
@@ -68,5 +69,41 @@ export function ShareDialog({ store, onClose }: { store: BoardStore; onClose: ()
         )}
       </div>
     </div>
+  )
+}
+
+function CoAdmins({ store }: { store: BoardStore }) {
+  const [label, setLabel] = useState('')
+  const last = store.lastInvite
+  return (
+    <section className="coadmins">
+      <h3>Co-admins</h3>
+      <form
+        className="copy-row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          store.send({ t: 'invite', label: label.trim() || 'Co-admin' })
+          setLabel('')
+        }}
+      >
+        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nom du collègue" maxLength={40} aria-label="Nom du co-admin" />
+        <button type="submit">Créer un lien</button>
+      </form>
+      {last && store.invites.some((i) => i.id === last.id) && (
+        <CopyField label="Nouveau lien co-admin (affiché une seule fois)" value={adminUrl(store.code, last.token)} secret />
+      )}
+      {store.invites.length > 0 && (
+        <ul className="invites">
+          {store.invites.map((inv) => (
+            <li key={inv.id}>
+              <span>{inv.label}</span>
+              <button type="button" className="small" onClick={() => store.send({ t: 'revokeInvite', id: inv.id })}>
+                Révoquer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

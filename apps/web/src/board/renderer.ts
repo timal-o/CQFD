@@ -1,5 +1,6 @@
 import { elementBox, intersects, viewportBox, worldToScreen } from './geometry'
-import { buildStrokePath, drawBackground, fillStroke, inkColor, strokePath } from './render'
+import { curveSamples, loadMath } from '../math/curves'
+import { buildStrokePath, drawBackground, drawGraph, fillStroke, inkColor, strokePath } from './render'
 import type { BoardStore, RenderKind } from './store'
 import { LASER_TRAIL_MS, type Box, type LaserPoint } from './types'
 
@@ -80,12 +81,43 @@ export class BoardRenderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     drawBackground(ctx, bg, cam, this.width, this.height)
     ctx.setTransform(this.dpr * cam.z, 0, 0, this.dpr * cam.z, this.dpr * cam.x, this.dpr * cam.y)
-    const view = viewportBox(cam, this.width, this.height)
-    for (const el of this.store.pageElements()) {
-      if (el.type !== 'stroke') continue
-      if (!intersects(view, elementBox(el, this.store.domSizes))) continue
-      fillStroke(ctx, strokePath(el), el.tool, el.color, bg)
+    const image = this.store.page?.image
+    if (image) {
+      const img = this.image(image.id)
+      if (img.complete && img.naturalWidth > 0) ctx.drawImage(img, 0, 0, image.w, image.h)
     }
+    const view = viewportBox(cam, this.width, this.height)
+    let mathMissing = false
+    for (const el of this.store.pageElements()) {
+      if (el.type !== 'stroke' && el.type !== 'graph') continue
+      if (!intersects(view, elementBox(el, this.store.domSizes))) continue
+      if (el.type === 'stroke') {
+        fillStroke(ctx, strokePath(el), el.tool, el.color, bg)
+      } else {
+        drawGraph(ctx, el, bg, (curve) => {
+          const s = curveSamples(el, curve)
+          if (!s) mathMissing = true
+          return s
+        })
+      }
+    }
+    // mathjs n'est chargé qu'au premier repère affiché ; on redessine une fois prêt.
+    if (mathMissing) void loadMath().then(() => this.invalidate('doc'))
+  }
+
+  private images = new Map<string, HTMLImageElement>()
+
+  /** Image de fond d'une page (servie par la salle), chargée une fois. */
+  private image(id: string): HTMLImageElement {
+    let img = this.images.get(id)
+    if (!img) {
+      img = new Image()
+      img.decoding = 'async'
+      img.onload = () => this.invalidate('doc')
+      img.src = `/api/rooms/${this.store.code}/assets/${id}`
+      this.images.set(id, img)
+    }
+    return img
   }
 
   /** Renvoie true s'il faut continuer à animer (laser qui s'estompe, tracés en direct). */

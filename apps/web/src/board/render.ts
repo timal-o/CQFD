@@ -1,5 +1,6 @@
 import { getStroke } from 'perfect-freehand'
-import type { PageBackground, StrokeElement } from '@cqfd/shared'
+import type { GraphElement, PageBackground, StrokeElement } from '@cqfd/shared'
+import { niceStep, type Polyline } from '../math/sampling'
 import type { Camera } from './types'
 
 export const DARK_BG = '#1f2328'
@@ -142,4 +143,127 @@ export function drawBackground(
     default:
       break
   }
+}
+
+// ------------------------------------------------------------ repère et courbes
+
+const AXIS_COLOR = '#334155'
+const GRID_COLOR = '#e2e8f0'
+
+function formatTick(v: number, step: number): string {
+  const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9))
+  return (Math.abs(v) < step / 1e6 ? 0 : v).toFixed(decimals).replace('.', ',').replace('-', '−')
+}
+
+/** Dessine un repère (cadre, grille, axes gradués) et ses courbes, en coordonnées du monde. */
+export function drawGraph(
+  ctx: CanvasRenderingContext2D,
+  el: GraphElement,
+  bg: PageBackground,
+  samplesFor: (curve: GraphElement['curves'][number]) => Polyline[] | undefined,
+): void {
+  const { x, y, w, h, xmin, xmax, ymin, ymax } = el
+  const sx = (gx: number) => x + ((gx - xmin) / (xmax - xmin)) * w
+  const sy = (gy: number) => y + ((ymax - gy) / (ymax - ymin)) * h
+  const dark = bg === 'dark'
+  const axis = dark ? '#cbd5e1' : AXIS_COLOR
+  const label = Math.max(9, Math.min(16, Math.min(w, h) / 26))
+  const stepX = niceStep(xmax - xmin, w / 70)
+  const stepY = niceStep(ymax - ymin, h / 55)
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(x, y, w, h)
+  ctx.fillStyle = dark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.85)'
+  ctx.fill()
+  ctx.clip()
+
+  if (el.grid) {
+    ctx.strokeStyle = dark ? '#334155' : GRID_COLOR
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    for (let gx = Math.ceil(xmin / stepX) * stepX; gx <= xmax; gx += stepX) {
+      ctx.moveTo(sx(gx), y)
+      ctx.lineTo(sx(gx), y + h)
+    }
+    for (let gy = Math.ceil(ymin / stepY) * stepY; gy <= ymax; gy += stepY) {
+      ctx.moveTo(x, sy(gy))
+      ctx.lineTo(x + w, sy(gy))
+    }
+    ctx.stroke()
+  }
+
+  // Axes (ou bord du cadre si l'origine est hors fenêtre).
+  const ax = Math.min(x + w, Math.max(x, sx(0)))
+  const ay = Math.min(y + h, Math.max(y, sy(0)))
+  ctx.strokeStyle = axis
+  ctx.fillStyle = axis
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(x, ay)
+  ctx.lineTo(x + w, ay)
+  ctx.moveTo(ax, y)
+  ctx.lineTo(ax, y + h)
+  ctx.stroke()
+  // Flèches.
+  ctx.beginPath()
+  ctx.moveTo(x + w, ay)
+  ctx.lineTo(x + w - 8, ay - 4)
+  ctx.lineTo(x + w - 8, ay + 4)
+  ctx.moveTo(ax, y)
+  ctx.lineTo(ax - 4, y + 8)
+  ctx.lineTo(ax + 4, y + 8)
+  ctx.fill()
+
+  // Graduations.
+  ctx.font = `${label}px system-ui, sans-serif`
+  ctx.lineWidth = 1
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  for (let gx = Math.ceil(xmin / stepX) * stepX; gx <= xmax; gx += stepX) {
+    if (Math.abs(gx) < stepX / 2) continue
+    const px = sx(gx)
+    ctx.beginPath()
+    ctx.moveTo(px, ay - 3)
+    ctx.lineTo(px, ay + 3)
+    ctx.stroke()
+    ctx.fillText(formatTick(gx, stepX), px, Math.min(ay + 4, y + h - label - 2))
+  }
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
+  for (let gy = Math.ceil(ymin / stepY) * stepY; gy <= ymax; gy += stepY) {
+    if (Math.abs(gy) < stepY / 2) continue
+    const py = sy(gy)
+    ctx.beginPath()
+    ctx.moveTo(ax - 3, py)
+    ctx.lineTo(ax + 3, py)
+    ctx.stroke()
+    ctx.fillText(formatTick(gy, stepY), Math.max(ax - 5, x + label * 2), py)
+  }
+  if (xmin < 0 && xmax > 0 && ymin < 0 && ymax > 0) {
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillText('0', ax - 4, ay + 4)
+  }
+
+  // Courbes.
+  ctx.lineWidth = Math.max(1.5, Math.min(w, h) / 160)
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  for (const curve of el.curves) {
+    const lines = samplesFor(curve)
+    if (!lines) continue
+    ctx.strokeStyle = inkColor(curve.color, bg)
+    ctx.beginPath()
+    for (const line of lines) {
+      ctx.moveTo(sx(line[0]!), sy(line[1]!))
+      for (let i = 2; i < line.length; i += 2) ctx.lineTo(sx(line[i]!), sy(line[i + 1]!))
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  ctx.strokeStyle = dark ? '#475569' : '#cbd5e1'
+  ctx.lineWidth = 1
+  ctx.strokeRect(x, y, w, h)
 }

@@ -4,6 +4,7 @@ import {
   SEND_INTERVALS,
   type BoardElement,
   type FormulaElement,
+  type GraphElement,
   type Op,
   type StrokeElement,
   type TextElement,
@@ -46,6 +47,8 @@ type Gesture =
       last: { x: number; y: number } | null
       /** Éléments existants avant le geste, supprimés. */
       removed: Set<string>
+      /** Leur état d'origine (pour l'annulation). */
+      originals: Map<string, StrokeElement>
       /** Morceaux créés pendant le geste (gomme pixel). */
       created: Map<string, StrokeElement>
     }
@@ -224,7 +227,11 @@ export class BoardController {
     const pos = this.local(e)
     const w = screenToWorld(this.store.camera(), pos.x, pos.y)
     const tool = this.store.tools.tool
-    this.el.setPointerCapture(e.pointerId)
+    try {
+      this.el.setPointerCapture(e.pointerId)
+    } catch {
+      // pointeur déjà relâché (ou événement synthétique)
+    }
 
     // Rejet de la paume : dès qu'un stylet a été vu, le doigt sert seulement à se déplacer.
     const palm = e.pointerType === 'touch' && this.penSeen
@@ -244,6 +251,7 @@ export class BoardController {
         mode: eraserTip ? 'stroke' : this.store.tools.eraserMode,
         last: null,
         removed: new Set(),
+        originals: new Map(),
         created: new Map(),
       }
       this.eraseAt(w.x, w.y)
@@ -282,6 +290,8 @@ export class BoardController {
         return this.textAt(w.x, w.y)
       case 'formula':
         return this.formulaAt(w.x, w.y)
+      case 'graph':
+        return this.graphAt(w.x, w.y)
       case 'select':
         return this.selectDown(e, pos, w)
       default:
@@ -406,7 +416,7 @@ export class BoardController {
             .map((id) => this.store.elements.get(id))
             .filter((el): el is BoardElement => !!el)
             .map((el) => ({ o: 'put', el }))
-          this.store.commit(ops, true)
+          this.store.commit(ops, { applied: true, before: new Map(g.originals) })
         }
         return
       case 'resize': {
@@ -414,7 +424,7 @@ export class BoardController {
           .map((id) => this.store.elements.get(id))
           .filter((el): el is BoardElement => !!el)
           .map((el) => ({ o: 'put', el }))
-        this.store.commit(ops, true)
+        this.store.commit(ops, { applied: true, before: new Map(g.originals) })
         return
       }
       case 'marquee': {
@@ -515,12 +525,16 @@ export class BoardController {
         if (g.mode === 'stroke') {
           if (!hitStroke(el, s.x, s.y, radius)) continue
           g.removed.add(el.id)
+          g.originals.set(el.id, el)
           ops.push({ o: 'del', id: el.id })
         } else {
           const pieces = eraseFromStroke(el, s.x, s.y, radius)
           if (!pieces) continue
           if (g.created.has(el.id)) g.created.delete(el.id)
-          else g.removed.add(el.id)
+          else {
+            g.removed.add(el.id)
+            g.originals.set(el.id, el)
+          }
           ops.push({ o: 'del', id: el.id })
           for (const p of pieces) {
             g.created.set(p.id, p)
@@ -542,7 +556,12 @@ export class BoardController {
       ...[...g.created.values()].map((el): Op => ({ o: 'put', el })),
     ]
     for (let i = 0; i < ops.length; i += LIMITS.maxOpsPerMessage) {
-      this.store.commit(ops.slice(i, i + LIMITS.maxOpsPerMessage), true)
+      const chunk = ops.slice(i, i + LIMITS.maxOpsPerMessage)
+      const before = new Map(chunk.map((op) => {
+        const id = op.o === 'put' ? op.el.id : op.id
+        return [id, g.originals.get(id) ?? null] as const
+      }))
+      this.store.commit(chunk, { applied: true, before })
     }
   }
 
@@ -707,13 +726,43 @@ export class BoardController {
     store.startEditing(el.id)
   }
 
+  private graphAt(x: number, y: number): void {
+    const store = this.store
+    if (!store.canWrite) return this.denied(this.writeDeniedMessage())
+    const hit = this.topHit(x, y, true)
+    if (hit?.type === 'graph') {
+      store.startEditing(hit.id)
+      return
+    }
+    const z = store.camera().z
+    const el: GraphElement = {
+      id: randomId(),
+      pageId: store.pageId!,
+      authorId: store.me!.id,
+      z: store.nextZ(),
+      type: 'graph',
+      x: Math.round(x),
+      y: Math.round(y),
+      w: Math.round(440 / z),
+      h: Math.round(330 / z),
+      xmin: -5,
+      xmax: 5,
+      ymin: -4,
+      ymax: 4,
+      grid: true,
+      curves: [],
+    }
+    store.commit([{ o: 'put', el }])
+    store.startEditing(el.id)
+  }
+
   private onDoubleClick(e: MouseEvent): void {
     const tool = this.store.tools.tool
-    if (tool !== 'select' && tool !== 'text' && tool !== 'formula') return
+    if (tool !== 'select' && tool !== 'text' && tool !== 'formula' && tool !== 'graph') return
     if ((e.target as HTMLElement).closest('[data-editor]')) return
     const w = this.world(e)
     const hit = this.topHit(w.x, w.y, true)
-    if ((hit?.type === 'text' || hit?.type === 'formula') && this.store.canWrite) this.store.startEditing(hit.id)
+    if (hit && hit.type !== 'stroke' && this.store.canWrite) this.store.startEditing(hit.id)
   }
 
   // ---------------------------------------------------------------- molette et clavier
@@ -736,8 +785,20 @@ export class BoardController {
       if (e.type === 'keydown') e.preventDefault()
       return
     }
-    if (e.type !== 'keydown' || isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
+    if (e.type !== 'keydown' || isTyping(e.target)) return
     const store = this.store
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      const key = e.key.toLowerCase()
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        store.undo()
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault()
+        store.redo()
+      }
+      return
+    }
+    if (e.altKey) return
     if ((e.key === 'Delete' || e.key === 'Backspace') && store.selection.size > 0) {
       e.preventDefault()
       this.deleteSelection()
@@ -756,6 +817,7 @@ export class BoardController {
       e: { tool: 'eraser' },
       t: { tool: 'text' },
       f: { tool: 'formula' },
+      g: { tool: 'graph' },
       l: { tool: 'laser' },
       h: { tool: 'hand' },
     }

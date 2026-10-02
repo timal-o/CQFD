@@ -4,3 +4,7 @@ dist/
 .dev.vars
 *.log
 .DS_Store
+
+# Fichiers de test locaux
+*.png
+!apps/web/public/*.png

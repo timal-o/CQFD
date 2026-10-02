@@ -59,23 +59,56 @@ Aucun secret n'est nécessaire : les jetons admin sont générés par salle, et 
 - **Jeton admin** : il est transmis dans le fragment d'URL (`#admin=…`), jamais envoyé au serveur dans l'URL, et retiré de la barre d'adresse au chargement.
 - **IP** : elle n'est jamais stockée en clair. Seul un hash salé par salle sert aux bannissements (phase 3).
 
-## État d'avancement
+## Fonctionnalités
 
-Phase 1 (MVP), faite :
-- création de salle, rejoindre, rôles, main donnée ou retirée ;
-- pages en onglets ;
-- stylo (pression), surligneur, gomme par trait ou pixel, texte formaté ;
-- sélection, déplacement, redimensionnement ;
-- laser, fonds de page, gel et verrouillage.
+- **Salle sans compte** : code de 6 caractères, lien direct, QR code, lien admin secret, co-admins (liens révocables).
+- **Tableau** :
+  - pages en onglets (ajouter, renommer, dupliquer, réordonner, supprimer) ;
+  - fonds blanc, Seyès, petits carreaux, points, sombre ;
+  - import d'un PDF en fond (une page de PDF par page du tableau).
+- **Outils** :
+  - stylo sensible à la pression, surligneur, gomme par trait ou pixel ;
+  - texte formaté, formule (KaTeX/MathLive), repère avec courbes y = f(x) ;
+  - sélection, déplacement, redimensionnement, laser.
+- **Maths** :
+  - éditeur visuel MathLive ou LaTeX brut avec aperçu et autocomplétion ;
+  - clavier virtuel flottant à onglets ;
+  - raccourcis de frappe (`sum`, `int`, `lim`, `sqrt`, `binom`, `alpha`…, `/` pour une fraction).
+- **Classe** :
+  - lever la main (file ordonnée), donner ou retirer la main ;
+  - gel du tableau, verrouillage de la salle, limite de participants ;
+  - exclusion et bannissement (avec liste des bannis) ;
+  - chat que le prof peut couper ;
+  - flèches vers l'activité hors du champ de vision.
+- **Historique** : Ctrl+Z / Ctrl+Y personnels ; journal des actions visible du prof, qui peut annuler une action (avec avertissement si l'élément a changé depuis).
+- **Export** : page courante en PNG, toutes les pages en PDF (côté client).
+- **Tablette** : rejet de la paume ; dès qu'un stylet est détecté, le doigt sert seulement à déplacer et zoomer.
 
-Flèches au bord de l'écran vers l'activité hors du champ de vision (laser, tracé, modification) : un clic recentre la vue.
+Raccourcis :
+- outils : `V` sélection, `P` stylo, `S` surligneur, `E` gomme, `T` texte, `F` formule, `G` repère, `L` laser, `H` main ;
+- historique : Ctrl/⌘+Z annuler, Ctrl+Y ou Ctrl+Maj+Z rétablir ;
+- vue : Espace + glisser pour se déplacer, Ctrl/⌘ + molette ou pincement pour zoomer ;
+- sélection : Suppr pour effacer ;
+- formule : Entrée valide, Échap annule, Tab passe au champ suivant.
 
-Phase 2 (formules), faite :
-- objet formule rendu par KaTeX ;
-- édition visuelle MathLive (chargée à la demande) ou en LaTeX brut, avec aperçu et autocomplétion ;
-- clavier virtuel flottant à onglets ;
-- raccourcis de frappe (`sum`, `int`, `lim`, `sqrt`, `binom`, `alpha`…, `/` pour une fraction).
+## Suivre la consommation
 
-Les phases suivantes sont décrites dans [docs/plan.md](docs/plan.md).
+- **Dans chaque salle** : le serveur compte les messages du jour. Il prévient le prof, passe en mode économie (laser coupé), puis en lecture seule si le quota gratuit est atteint, avec l'heure de reprise.
+- **Pour tout le compte** : tableau de bord Cloudflare, menu **Workers & Pages**, Worker `cqfd`, onglet **Metrics**, et page **Durable Objects**, onglet **Metrics**. Aucune adresse publique de CQFD n'expose ces chiffres.
 
-Raccourcis : `V` sélection, `P` stylo, `S` surligneur, `E` gomme, `T` texte, `F` formule, `L` laser, `H` main. Espace + glisser pour déplacer la vue. Ctrl/⌘ + molette ou pincement pour zoomer. Suppr pour effacer la sélection. Dans une formule : Entrée valide, Échap annule, Tab passe au champ suivant.
+Limites gratuites par jour (remise à zéro à 00:00 UTC, soit 1 h ou 2 h à Paris) : 100 000 requêtes Worker, 100 000 requêtes Durable Objects, 5 millions de lignes SQLite lues, 100 000 lignes écrites. Au-delà, rien n'est facturé sur le plan Workers Free : les opérations échouent jusqu'au lendemain.
+
+## Tests
+
+```sh
+pnpm test                                          # tests unitaires (droits, protocole, salle sur vrai SQLite, géométrie, courbes)
+node scripts/loadtest.mjs http://localhost:8787 50 60   # test de charge : 50 clients pendant 60 s
+```
+
+## Limites connues
+
+- **Exclusion** : elle empêche de revenir avec le **même onglet**. Un nouvel onglet obtient un nouveau jeton, puisque sessionStorage est propre à chaque onglet. Le bannissement, qui bloque aussi l'IP, couvre ce cas.
+- **Formules** : pendant la saisie, une formule n'est visible que chez son auteur ; les autres la voient à la validation.
+- **Superposition** : les textes et formules (HTML) s'affichent toujours au-dessus des traits (canvas).
+
+Décisions et mesures détaillées : [docs/adr/](docs/adr/).

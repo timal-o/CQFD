@@ -53,6 +53,15 @@ export default {
       return stub.fetch(new Request(url.toString(), { headers }))
     }
 
+    // Images de fond d'une salle (pages de PDF importées).
+    const asset = url.pathname.match(/^\/api\/rooms\/([A-Za-z0-9]+)\/assets\/([A-Za-z0-9_-]{1,40})$/)
+    if (asset && request.method === 'GET') {
+      const code = asset[1]!.toUpperCase()
+      if (!isValidCode(code)) return json({ error: 'Code invalide' }, 404)
+      const stub = env.ROOM.get(env.ROOM.idFromName(code))
+      return stub.fetch(new Request(`https://room/asset/${asset[2]}`))
+    }
+
     if (url.pathname.startsWith('/api/')) return json({ error: 'Introuvable' }, 404)
     return env.ASSETS.fetch(request)
   },

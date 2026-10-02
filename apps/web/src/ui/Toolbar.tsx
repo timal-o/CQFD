@@ -1,4 +1,4 @@
-import { Eraser, Hand, Highlighter, Minus, MousePointer2, Pen, Plus, Sigma, Target, Trash2, Type } from 'lucide-react'
+import { ChartSpline, Eraser, Hand, Highlighter, Minus, MousePointer2, Pen, Plus, Redo2, Sigma, Target, Trash2, Type, Undo2 } from 'lucide-react'
 import type { BoardController } from '../board/controller'
 import { HIGHLIGHTER_COLORS, PEN_COLORS, PEN_SIZES, type BoardStore } from '../board/store'
 import type { Tool } from '../board/types'
@@ -10,6 +10,7 @@ const TOOLS: { tool: Tool; label: string; key: string; icon: React.ReactNode; wr
   { tool: 'eraser', label: 'Gomme', key: 'E', icon: <Eraser size={20} />, write: true },
   { tool: 'text', label: 'Texte', key: 'T', icon: <Type size={20} />, write: true },
   { tool: 'formula', label: 'Formule', key: 'F', icon: <Sigma size={20} />, write: true },
+  { tool: 'graph', label: 'Repère et courbes', key: 'G', icon: <ChartSpline size={20} />, write: true },
   { tool: 'laser', label: 'Pointeur laser', key: 'L', icon: <Target size={20} /> },
   { tool: 'hand', label: 'Déplacer la vue', key: 'H', icon: <Hand size={20} /> },
 ]
@@ -103,6 +104,17 @@ export function Toolbar({ store, controller }: { store: BoardStore; controller: 
         <div className="tool-group">
           <button className="tool" onClick={() => controller?.deleteSelection()} title="Supprimer (Suppr)" aria-label="Supprimer la sélection">
             <Trash2 size={20} />
+          </button>
+        </div>
+      )}
+
+      {canWrite && (
+        <div className="tool-group">
+          <button className="tool" onClick={() => store.undo()} disabled={!store.canUndo} aria-label="Annuler" title="Annuler (Ctrl+Z)">
+            <Undo2 size={18} />
+          </button>
+          <button className="tool" onClick={() => store.redo()} disabled={!store.canRedo} aria-label="Rétablir" title="Rétablir (Ctrl+Y)">
+            <Redo2 size={18} />
           </button>
         </div>
       )}

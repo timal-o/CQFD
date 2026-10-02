@@ -60,7 +60,30 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     frozen: z.boolean().optional(),
     locked: z.boolean().optional(),
     laserForStudents: z.boolean().optional(),
+    chatEnabled: z.boolean().optional(),
     maxParticipants: z.number().int().min(LIMITS.minParticipants).max(LIMITS.maxParticipants).optional(),
+  }),
+  /** Lever / baisser la main (un admin peut baisser celle d'un élève avec `pid`). */
+  z.object({ t: z.literal('hand'), up: z.boolean(), pid: idSchema.optional() }),
+  z.object({ t: z.literal('kick'), pid: idSchema }),
+  z.object({ t: z.literal('ban'), pid: idSchema }),
+  z.object({ t: z.literal('unban'), id: idSchema }),
+  z.object({ t: z.literal('chat'), text: z.string().min(1).max(LIMITS.maxChatChars * 2) }),
+  /** Annuler une action du journal (admin). `force` écrase les modifications faites depuis. */
+  z.object({ t: z.literal('revert'), seq: z.number().int().nonnegative(), force: z.boolean().optional() }),
+  z.object({ t: z.literal('invite'), label: z.string().max(40) }),
+  z.object({ t: z.literal('revokeInvite'), id: idSchema }),
+  /** Morceau d'image de fond (base64), envoyé par un admin. */
+  z.object({
+    t: z.literal('asset'),
+    id: idSchema,
+    pageId: idSchema,
+    mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    w: z.number().int().min(1).max(10_000),
+    h: z.number().int().min(1).max(10_000),
+    idx: z.number().int().min(0).max(99),
+    total: z.number().int().min(1).max(100),
+    data: z.string().max(LIMITS.maxAssetChunkBase64).regex(/^[A-Za-z0-9+/]*={0,2}$/),
   }),
 ])
 export type ClientMessage = z.infer<typeof clientMessageSchema>
@@ -69,6 +92,7 @@ export interface RoomSettings {
   frozen: boolean
   locked: boolean
   laserForStudents: boolean
+  chatEnabled: boolean
   maxParticipants: number
 }
 
@@ -78,7 +102,41 @@ export interface ParticipantInfo {
   role: Role
   canWrite: boolean
   online: boolean
+  /** Horodatage de la main levée (null si baissée) : sert à ordonner la file. */
+  handAt: number | null
 }
+
+export interface ChatMessage {
+  seq: number
+  at: number
+  by: string
+  name: string
+  text: string
+}
+
+export interface BanInfo {
+  id: string
+  name: string
+  at: number
+}
+
+export interface LogEntry {
+  seq: number
+  at: number
+  by: string
+  name: string
+  summary: string
+  /** Faux si l'action était trop volumineuse pour être conservée en détail. */
+  revertable: boolean
+}
+
+export interface InviteInfo {
+  id: string
+  label: string
+  at: number
+}
+
+export type QuotaLevel = 'ok' | 'warn' | 'degraded' | 'exceeded'
 
 export interface Me {
   id: string
@@ -109,6 +167,10 @@ export type ServerMessage =
       elements: BoardElement[]
       participants: ParticipantInfo[]
       adminPage: string | null
+      chat: ChatMessage[]
+      quota: QuotaLevel
+      /** Réservé aux admins. */
+      admin?: { bans: BanInfo[]; log: LogEntry[]; invites: InviteInfo[] }
     }
   | { t: 'ops'; by: string; ops: Op[] }
   | { t: 'ack'; seq: number }
@@ -130,6 +192,14 @@ export type ServerMessage =
   | { t: 'you'; you: Me }
   | { t: 'settings'; settings: RoomSettings }
   | { t: 'view'; pageId: string }
+  | { t: 'chat'; msg: ChatMessage }
+  | { t: 'hand'; name: string }
+  | { t: 'bans'; bans: BanInfo[] }
+  | { t: 'log'; entries: LogEntry[] }
+  | { t: 'revertConflict'; seq: number; message: string }
+  | { t: 'invites'; invites: InviteInfo[] }
+  | { t: 'inviteCreated'; id: string; token: string }
+  | { t: 'quota'; level: QuotaLevel }
   | { t: 'error'; code: ErrorCode; message: string }
 
 /** Codes de fermeture WebSocket applicatifs (4000-4999). */

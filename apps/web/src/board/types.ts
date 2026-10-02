@@ -5,7 +5,7 @@ export interface Camera {
   z: number
 }
 
-export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'formula' | 'laser' | 'hand'
+export type Tool = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text' | 'formula' | 'graph' | 'laser' | 'hand'
 export type EraserMode = 'stroke' | 'pixel'
 
 export interface ToolSettings {

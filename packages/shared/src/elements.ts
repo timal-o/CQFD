@@ -65,14 +65,41 @@ export const formulaSchema = z.object({
   color: colorSchema,
 })
 
-export const elementSchema = z.union([strokeSchema, textSchema, formulaSchema])
+const windowBound = z.number().finite().min(-1e6).max(1e6)
+
+export const curveSchema = z.object({
+  id: idSchema,
+  /** y = f(x), source LaTeX (même éditeur que les formules). */
+  latex: z.string().max(LIMITS.maxCurveLatexChars),
+  color: colorSchema,
+})
+
+/** Repère orthonormé avec courbes y = f(x). */
+export const graphSchema = z
+  .object({
+    ...base,
+    type: z.literal('graph'),
+    w: z.number().min(60).max(5000),
+    h: z.number().min(60).max(5000),
+    xmin: windowBound,
+    xmax: windowBound,
+    ymin: windowBound,
+    ymax: windowBound,
+    grid: z.boolean(),
+    curves: z.array(curveSchema).max(LIMITS.maxCurves),
+  })
+  .refine((g) => g.xmin < g.xmax && g.ymin < g.ymax, 'fenêtre invalide')
+
+export const elementSchema = z.union([strokeSchema, textSchema, formulaSchema, graphSchema])
 
 export type StrokeElement = z.infer<typeof strokeSchema>
 export type TextRun = z.infer<typeof textRunSchema>
 export type TextBlock = z.infer<typeof textBlockSchema>
 export type TextElement = z.infer<typeof textSchema>
 export type FormulaElement = z.infer<typeof formulaSchema>
-export type BoardElement = StrokeElement | TextElement | FormulaElement
+export type Curve = z.infer<typeof curveSchema>
+export type GraphElement = z.infer<typeof graphSchema>
+export type BoardElement = StrokeElement | TextElement | FormulaElement | GraphElement
 export type ElementType = BoardElement['type']
 
 export const PAGE_BACKGROUNDS = ['blank', 'seyes', 'grid', 'dots', 'dark'] as const
@@ -84,4 +111,12 @@ export const pageSchema = z.object({
   ord: z.number().finite(),
   bg: z.enum(PAGE_BACKGROUNDS),
 })
-export type Page = z.infer<typeof pageSchema>
+
+/** Image de fond (page de PDF importée), stockée dans la salle. */
+export interface PageImage {
+  id: string
+  w: number
+  h: number
+}
+
+export type Page = z.infer<typeof pageSchema> & { image?: PageImage | null }

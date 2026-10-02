@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { LIMITS, PAGE_BACKGROUNDS, randomId, type Page, type PageBackground } from '@cqfd/shared'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { FileUp, MoreHorizontal, Plus } from 'lucide-react'
 import type { BoardStore } from '../board/store'
+import { importPdf } from '../lib/pdfImport'
 
 const BG_LABELS: Record<PageBackground, string> = {
   blank: 'Blanc',
@@ -26,6 +27,7 @@ export function PageTabs({ store }: { store: BoardStore }) {
     pendingSwitch.current = id
   }
   const pendingSwitch = useRef<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (pendingSwitch.current && pages.some((p) => p.id === pendingSwitch.current)) {
       store.setPage(pendingSwitch.current)
@@ -120,6 +122,29 @@ export function PageTabs({ store }: { store: BoardStore }) {
         <button className="tab-add" onClick={add} aria-label="Ajouter une page" title="Ajouter une page">
           <Plus size={16} />
         </button>
+      )}
+      {admin && (
+        <>
+          <button className="tab-add" onClick={() => fileInput.current?.click()} aria-label="Importer un PDF" title="Importer un PDF (une page de PDF par page du tableau)">
+            <FileUp size={16} />
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/pdf"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) {
+                importPdf(store, file).catch((err) => {
+                  console.error(err)
+                  store.toast('Import du PDF impossible.')
+                })
+              }
+            }}
+          />
+        </>
       )}
     </nav>
   )

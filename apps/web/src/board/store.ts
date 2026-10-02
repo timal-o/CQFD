@@ -2,12 +2,17 @@ import {
   canEditElement,
   canUseLaser,
   canWrite,
+  type BanInfo,
   type BoardElement,
+  type ChatMessage,
   type ClientMessage,
+  type InviteInfo,
+  type LogEntry,
   type Me,
   type Op,
   type Page,
   type ParticipantInfo,
+  type QuotaLevel,
   type RoomSettings,
   type ServerMessage,
   type TextBlock,
@@ -34,6 +39,23 @@ export interface Toast {
   text: string
 }
 
+/** Une étape d'annulation : état des éléments avant et après une de mes actions. */
+interface HistoryEntry {
+  before: Map<string, BoardElement | null>
+  after: Map<string, BoardElement | null>
+}
+
+const MAX_HISTORY = 100
+
+export interface CommitOptions {
+  /** Les opérations sont déjà appliquées localement (aperçu pendant le geste). */
+  applied?: boolean
+  /** État avant l'action, obligatoire pour l'annulation si `applied`. */
+  before?: Map<string, BoardElement | null>
+  /** Faux pour ne pas créer d'étape d'annulation (annuler / rétablir eux-mêmes). */
+  history?: boolean
+}
+
 const FATAL_ERRORS = new Set(['not_found', 'banned', 'kicked', 'locked', 'full', 'replaced'])
 
 export const PEN_COLORS = ['#111827', '#1d4ed8', '#dc2626', '#15803d', '#ea580c', '#7c3aed']
@@ -48,7 +70,7 @@ export class BoardStore {
   status: SocketStatus = 'connecting'
   fatal: { code: string; message: string } | null = null
   me: Me | null = null
-  settings: RoomSettings = { frozen: false, locked: false, laserForStudents: false, maxParticipants: 50 }
+  settings: RoomSettings = { frozen: false, locked: false, laserForStudents: false, chatEnabled: true, maxParticipants: 50 }
   pages: Page[] = []
   elements = new Map<string, BoardElement>()
   participants: ParticipantInfo[] = []
@@ -79,6 +101,17 @@ export class BoardStore {
   lasers = new Map<string, LaserTrail>()
   activity = new Map<string, Activity>()
   toasts: Toast[] = []
+
+  chat: ChatMessage[] = []
+  unreadChat = 0
+  chatOpen = false
+  bans: BanInfo[] = []
+  log: LogEntry[] = []
+  invites: InviteInfo[] = []
+  lastInvite: { id: string; token: string } | null = null
+  quota: QuotaLevel = 'ok'
+  private undoStack: HistoryEntry[] = []
+  private redoStack: HistoryEntry[] = []
 
   version = 0
   private socket: RoomSocket
@@ -163,7 +196,19 @@ export class BoardStore {
   }
 
   get canWrite(): boolean {
+    if (this.quota === 'exceeded') return false
     return this.me ? canWrite(this.me, this.flags) : false
+  }
+
+  /** Ma main levée (élève). */
+  get handUp(): boolean {
+    return this.participants.find((p) => p.id === this.me?.id)?.handAt != null
+  }
+
+  setChatOpen(open: boolean): void {
+    this.chatOpen = open
+    if (open) this.unreadChat = 0
+    this.emit()
   }
 
   get canLaser(): boolean {
@@ -260,12 +305,70 @@ export class BoardStore {
   }
 
   /** Envoie des opérations (appliquées localement d'abord, de façon optimiste). */
-  commit(ops: Op[], alreadyApplied = false): void {
+  commit(ops: Op[], opts: CommitOptions = {}): void {
     if (ops.length === 0) return
-    if (!alreadyApplied) this.applyLocal(ops)
+    const ids = ops.map((op) => (op.o === 'put' ? op.el.id : op.id))
+    let before = opts.before
+    if (!opts.applied) {
+      before = new Map(ids.map((id) => [id, this.elements.get(id) ?? null]))
+      this.applyLocal(ops)
+    }
+    if (opts.history !== false && before) {
+      const after = new Map(ids.map((id) => [id, this.elements.get(id) ?? null]))
+      this.undoStack.push({ before: new Map(ids.map((id) => [id, before.get(id) ?? null])), after })
+      if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift()
+      this.redoStack = []
+      this.emit()
+    }
     const seq = ++this.seq
     this.pending.set(seq, ops)
     this.send({ t: 'ops', seq, ops })
+  }
+
+  get canUndo(): boolean {
+    return this.undoStack.length > 0
+  }
+
+  get canRedo(): boolean {
+    return this.redoStack.length > 0
+  }
+
+  undo(): void {
+    this.travel(this.undoStack, this.redoStack, 'before', 'after')
+  }
+
+  redo(): void {
+    this.travel(this.redoStack, this.undoStack, 'after', 'before')
+  }
+
+  /**
+   * Annulation personnelle : ne touche que mes propres actions. Un élément modifié depuis
+   * par quelqu'un d'autre n'est pas écrasé.
+   */
+  private travel(from: HistoryEntry[], to: HistoryEntry[], target: 'before' | 'after', expected: 'before' | 'after'): void {
+    const entry = from.pop()
+    if (!entry) return
+    if (!this.canWrite) {
+      from.push(entry)
+      this.toast('Vous n’avez pas la main.')
+      return
+    }
+    const pageIds = new Set(this.pages.map((p) => p.id))
+    const ops: Op[] = []
+    let skipped = 0
+    for (const [id, wanted] of entry[target]) {
+      const current = this.elements.get(id) ?? null
+      if (JSON.stringify(current) !== JSON.stringify(entry[expected].get(id) ?? null)) {
+        skipped++
+        continue
+      }
+      if (wanted && !pageIds.has(wanted.pageId)) continue
+      ops.push(wanted ? { o: 'put', el: wanted } : { o: 'del', id })
+    }
+    if (skipped > 0) this.toast('Certains éléments ont été modifiés depuis par quelqu’un d’autre : ils sont laissés tels quels.')
+    this.commit(ops, { history: false })
+    to.push(entry)
+    this.emit()
   }
 
   startEditing(id: string): void {
@@ -287,11 +390,14 @@ export class BoardStore {
     if (el?.type === 'text') {
       const empty = blocks.every((b) => b.runs.every((r) => r.s.trim() === ''))
       const next = { ...el, blocks }
+      // L'élément a pu être prévisualisé localement (taille) : l'état « avant » est l'original.
+      const before = new Map([[id, isDraft ? null : original]])
       if (empty) {
-        if (isDraft) this.applyLocal([{ o: 'del', id }])
-        else this.commit([{ o: 'del', id }])
+        this.applyLocal([{ o: 'del', id }])
+        if (!isDraft) this.commit([{ o: 'del', id }], { applied: true, before })
       } else if (isDraft || JSON.stringify(next) !== JSON.stringify(original)) {
-        this.commit([{ o: 'put', el: next }])
+        this.applyLocal([{ o: 'put', el: next }])
+        this.commit([{ o: 'put', el: next }], { applied: true, before })
       }
     }
     this.emit()
@@ -312,9 +418,13 @@ export class BoardStore {
       const next = { ...el, latex: latex.trim() }
       if (!next.latex) {
         if (isDraft) this.applyLocal([{ o: 'del', id }])
-        else this.commit([{ o: 'del', id }])
+        else {
+          this.applyLocal([{ o: 'del', id }])
+          this.commit([{ o: 'del', id }], { applied: true, before: new Map([[id, original]]) })
+        }
       } else if (isDraft || JSON.stringify(next) !== JSON.stringify(original)) {
-        this.commit([{ o: 'put', el: next }])
+        this.applyLocal([{ o: 'put', el: next }])
+        this.commit([{ o: 'put', el: next }], { applied: true, before: new Map([[id, isDraft ? null : original]]) })
       }
     }
     this.emit()
@@ -329,6 +439,12 @@ export class BoardStore {
     this.stopEditing(id)
     if (isDraft) this.applyLocal([{ o: 'del', id }])
     else if (original) this.applyLocal([{ o: 'put', el: original }])
+    this.emit()
+  }
+
+  /** Ferme un éditeur dont les modifications sont déjà envoyées au fil de l'eau (repère). */
+  closeEditing(): void {
+    if (this.editingId) this.stopEditing(this.editingId)
     this.emit()
   }
 
@@ -353,6 +469,11 @@ export class BoardStore {
         this.elements = new Map(msg.elements.map((e) => [e.id, e]))
         for (const d of drafts) this.elements.set(d.id, d)
         this.live.clear()
+        this.chat = msg.chat
+        this.quota = msg.quota
+        this.bans = msg.admin?.bans ?? []
+        this.log = msg.admin?.log ?? []
+        this.invites = msg.admin?.invites ?? []
         const keep = this.pageId && this.pages.some((p) => p.id === this.pageId)
         const target = this.follow && !this.isAdmin && this.adminPage ? this.adminPage : keep ? this.pageId : msg.adminPage
         this.pageId = target && this.pages.some((p) => p.id === target) ? target : (this.pages[0]?.id ?? null)
@@ -444,6 +565,32 @@ export class BoardStore {
       case 'view':
         this.adminPage = msg.pageId
         if (this.follow && !this.isAdmin) this.setPage(msg.pageId, true)
+        break
+      case 'chat':
+        this.chat = [...this.chat, msg.msg].slice(-200)
+        if (!this.chatOpen && msg.msg.by !== this.me?.id) this.unreadChat++
+        break
+      case 'hand':
+        this.toast(`✋ ${msg.name} lève la main`)
+        break
+      case 'bans':
+        this.bans = msg.bans
+        break
+      case 'log':
+        this.log = [...this.log, ...msg.entries].slice(-300)
+        break
+      case 'revertConflict':
+        if (confirm(msg.message)) this.send({ t: 'revert', seq: msg.seq, force: true })
+        break
+      case 'invites':
+        this.invites = msg.invites
+        break
+      case 'inviteCreated':
+        this.lastInvite = { id: msg.id, token: msg.token }
+        break
+      case 'quota':
+        this.quota = msg.level
+        if (msg.level === 'exceeded') this.toast('Quota gratuit du jour atteint : le tableau passe en lecture seule.')
         break
       case 'error':
         if (FATAL_ERRORS.has(msg.code)) this.fatal = { code: msg.code, message: msg.message }

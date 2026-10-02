@@ -111,7 +111,7 @@ export const KEYBOARD_LAYOUTS: KeyboardLayout[] = [
     label: 'Ensembles',
     tooltip: 'Ensembles et logique',
     rows: [
-      ['\\mathbb{N}', '\\mathbb{Z}', '\\mathbb{Q}', '\\mathbb{R}', '\\mathbb{C}', '\\mathbb{R}_{+}^{*}', '\\emptyset', '\\in', '\\notin', '\\mid'],
+      ['\\mathbb{N}', '\\mathbb{N}^{*}', '\\mathbb{Z}', '\\mathbb{Q}', '\\mathbb{R}', '\\mathbb{R}_{+}^{*}', '\\emptyset', '\\in', '\\notin', '\\mid'],
       ['\\subset', '\\subseteq', '\\not\\subset', '\\cup', '\\cap', '\\setminus', '\\left\\{#0\\right\\}', '\\left[#0,#0\\right]', '\\left]#0,#0\\right[', '\\llbracket#0,#0\\rrbracket'],
       ['\\forall', '\\exists', '\\exists!', '\\Rightarrow', '\\Leftarrow', '\\Leftrightarrow', '\\neg', '\\land', '\\lor', '\\times'],
       NAV_ROW,

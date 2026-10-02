@@ -4,6 +4,7 @@ import {
   HEARTBEAT_REQUEST,
   HEARTBEAT_RESPONSE,
   parseClientMessage,
+  randomId,
   randomToken,
   type ServerMessage,
 } from '@cqfd/shared'
@@ -46,7 +47,13 @@ export class Room extends DurableObject<Env> {
     this.core = new RoomCore(
       {
         exec: <T extends Record<string, SqlValue>>(query: string, ...bindings: SqlValue[]) =>
-          sql.exec<T>(query, ...bindings).toArray(),
+          sql
+            .exec(
+              query,
+              // Le runtime attend des ArrayBuffer pour les BLOB.
+              ...bindings.map((b) => (b instanceof Uint8Array ? b.slice().buffer : b)),
+            )
+            .toArray() as unknown as T[],
         transaction: (fn) => ctx.storage.transactionSync(fn),
       },
       () => this.openConns(),
@@ -73,6 +80,21 @@ export class Room extends DurableObject<Env> {
   }
 
   override async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url)
+    const asset = url.pathname.match(/^\/asset\/([A-Za-z0-9_-]{1,40})$/)
+    if (asset) {
+      if (!this.core.isInitialized()) return new Response('Introuvable', { status: 404 })
+      const found = this.core.readAsset(asset[1]!)
+      if (!found) return new Response('Introuvable', { status: 404 })
+      return new Response(found.bytes, {
+        headers: {
+          'content-type': found.mime,
+          // L'identifiant est aléatoire et le contenu ne change jamais.
+          'cache-control': 'private, max-age=86400, immutable',
+          'x-content-type-options': 'nosniff',
+        },
+      })
+    }
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('WebSocket attendu', { status: 426 })
     const { 0: client, 1: server } = new WebSocketPair()
 
@@ -93,6 +115,7 @@ export class Room extends DurableObject<Env> {
   }
 
   override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    this.core.noteIncoming()
     const conn = wrap(ws)
     const msg = typeof message === 'string' ? parseClientMessage(message) : null
     if (!msg) {
@@ -102,8 +125,14 @@ export class Room extends DurableObject<Env> {
     if (msg.t === 'join') {
       if (conn.att.pid) return
       const sessionHash = await sha256(msg.session)
-      const isAdmin = msg.admin ? timingSafeEqual(await sha256(msg.admin), this.core.adminHash()) : false
-      this.core.join(conn, { name: msg.name, sessionHash, isAdmin })
+      const admin = msg.admin ? this.core.adminAccess(await sha256(msg.admin), timingSafeEqual) : null
+      this.core.join(conn, { name: msg.name, sessionHash, admin })
+      return
+    }
+    if (msg.t === 'invite') {
+      if (conn.att.role !== 'admin') return
+      const token = randomToken(16)
+      this.core.createInvite(conn, randomId(), await sha256(token), token, msg.label)
       return
     }
     this.core.handle(conn, msg)

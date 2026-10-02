@@ -11,6 +11,7 @@ const CURSORS: Record<string, string> = {
   eraser: 'none',
   text: 'text',
   formula: 'crosshair',
+  graph: 'crosshair',
   laser: 'crosshair',
   hand: 'grab',
 }
