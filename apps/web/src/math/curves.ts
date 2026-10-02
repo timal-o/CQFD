@@ -8,13 +8,65 @@ let compileFn: ((expr: string) => { evaluate(scope: Record<string, number>): unk
 let loading: Promise<void> | null = null
 
 /**
+ * Liste blanche : une courbe venant d'un autre participant ne peut utiliser que x, des nombres,
+ * π, e, les opérations de base et les fonctions usuelles. Sinon, une expression comme
+ * `range(1, 1e7)` ou `ones(5000, 5000)` figerait le navigateur de toute la salle.
+ */
+const ALLOWED_FUNCTIONS = new Set([
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
+  'log', 'log10', 'exp', 'sqrt', 'nthRoot', 'abs', 'floor', 'ceil', 'round', 'sign',
+])
+const ALLOWED_SYMBOLS = new Set(['x', 'e', 'pi', 'Infinity', ...ALLOWED_FUNCTIONS])
+const ALLOWED_OPERATORS = new Set(['add', 'subtract', 'multiply', 'divide', 'pow', 'unaryMinus', 'unaryPlus'])
+
+interface ExprNode {
+  type: string
+  name?: string
+  fn?: string | ExprNode
+  value?: unknown
+  traverse(cb: (node: ExprNode) => void): void
+  compile(): { evaluate(scope: Record<string, number>): unknown }
+}
+
+function assertSafe(root: ExprNode): void {
+  root.traverse((n) => {
+    switch (n.type) {
+      case 'ConstantNode':
+        if (typeof n.value !== 'number') throw new Error('constante non numérique')
+        return
+      case 'SymbolNode':
+        if (!ALLOWED_SYMBOLS.has(n.name ?? '')) throw new Error(`symbole interdit : ${n.name}`)
+        return
+      case 'OperatorNode':
+        if (!ALLOWED_OPERATORS.has(n.fn as string)) throw new Error(`opérateur interdit : ${String(n.fn)}`)
+        return
+      case 'ParenthesisNode':
+        return
+      case 'FunctionNode': {
+        const fn = n.fn as ExprNode
+        if (fn.type !== 'SymbolNode' || !ALLOWED_FUNCTIONS.has(fn.name ?? '')) throw new Error('fonction interdite')
+        return
+      }
+      default:
+        throw new Error(`construction interdite : ${n.type}`)
+    }
+  })
+}
+
+/**
  * Charge mathjs à la demande (premier repère affiché). L'instance est bridée :
- * une expression ne peut ni importer, ni évaluer, ni redéfinir quoi que ce soit.
+ * une expression ne peut ni importer, ni évaluer, ni redéfinir quoi que ce soit,
+ * et seules les constructions de la liste blanche sont compilées.
  */
 export function loadMath(): Promise<void> {
   loading ??= import('mathjs').then(({ create, all }) => {
     const math = create(all!, { predictable: true })
-    const compile = math.compile.bind(math)
+    const parse = math.parse.bind(math) as unknown as (expr: string) => ExprNode
+    const compile = (expr: string) => {
+      const node = parse(expr)
+      assertSafe(node)
+      return node.compile()
+    }
     const forbidden = () => {
       throw new Error('fonction désactivée')
     }

@@ -471,7 +471,7 @@ describe('co-admins', () => {
 describe('images de fond', () => {
   it("assemble les morceaux, attache l'image à la page et la relit", () => {
     const prof = connect('Prof', 'sp', { admin: true })
-    const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7])
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 5, 6, 7])
     const b64 = (a: Uint8Array) => Buffer.from(a).toString('base64')
     const base = { t: 'asset', id: 'img1', pageId: 'page1', mime: 'image/jpeg', w: 800, h: 600, total: 2 } as const
     core.handle(prof, { ...base, idx: 0, data: b64(bytes.slice(0, 4)) })
@@ -480,6 +480,14 @@ describe('images de fond', () => {
     expect(core.pages()[0]!.image).toEqual({ id: 'img1', w: 800, h: 600 })
     expect(prof.last('pages')?.pages[0]?.image?.id).toBe('img1')
     expect([...core.readAsset('img1')!.bytes]).toEqual([...bytes])
+  })
+
+  it('refuse un fichier qui n’a pas la signature du format annoncé (HTML déguisé)', () => {
+    const prof = connect('Prof', 'sp', { admin: true })
+    const html = Buffer.from('<script>alert(1)</script>').toString('base64')
+    core.handle(prof, { t: 'asset', id: 'fake', pageId: 'page1', mime: 'image/png', w: 1, h: 1, idx: 0, total: 1, data: html })
+    expect(core.readAsset('fake')).toBeNull()
+    expect(prof.last('error')?.message).toBe('Image invalide.')
   })
 
   it('refusé aux élèves et au-delà du plafond par image', () => {

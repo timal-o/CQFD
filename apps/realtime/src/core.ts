@@ -128,6 +128,17 @@ export interface JoinRequest {
 
 const CONTROL_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f​-‏‪-‮⁠-⁯﻿]/g
 
+const IMAGE_SIGNATURES: Record<string, (b: Uint8Array) => boolean> = {
+  'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  'image/png': (b) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => b[i] === v),
+  'image/webp': (b) =>
+    String.fromCharCode(...b.subarray(0, 4)) === 'RIFF' && String.fromCharCode(...b.subarray(8, 12)) === 'WEBP',
+}
+
+function hasImageSignature(bytes: Uint8Array, mime: string): boolean {
+  return IMAGE_SIGNATURES[mime]?.(bytes) ?? false
+}
+
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64)
   const out = new Uint8Array(bin.length)
@@ -842,6 +853,8 @@ export class RoomCore {
     } catch {
       return fail('Image invalide.')
     }
+    // Le premier morceau doit commencer par la signature du format annoncé (pas de HTML déguisé).
+    if (msg.idx === 0 && !hasImageSignature(bytes, msg.mime)) return fail('Image invalide.')
     const meta = this.meta()
     const roomBytes = Number(meta.asset_bytes ?? 0)
     const assetBytes = Number(

@@ -128,6 +128,17 @@ export function Legal() {
         </section>
 
         <section>
+          <h2>Contenus</h2>
+          <p>
+            Les contenus d’une salle (tracés, textes, formules, documents PDF importés, messages) sont publiés par ses
+            participants, sous leur responsabilité ; ils ne sont visibles que des personnes présentes dans la salle et
+            sont effacés à la fin de la séance. Le professeur qui importe un document doit avoir le droit de le
+            diffuser à sa classe. Pour signaler un contenu illicite, contactez l’éditeur
+            {contact ? <> ({contact})</> : null}.
+          </p>
+        </section>
+
+        <section>
           <h2>Code et bibliothèques</h2>
           <p>
             CQFD s’appuie sur des logiciels libres :{' '}
@@ -136,6 +147,12 @@ export function Legal() {
                 {name} ({license}){i < LIBRARIES.length - 1 ? ', ' : '.'}
               </span>
             ))}
+            {' '}
+            Leurs mentions de licence complètes sont regroupées dans{' '}
+            <a href="/licences-tierces.txt" target="_blank" rel="noopener">
+              licences-tierces.txt
+            </a>
+            .
             {github && (
               <>
                 {' '}

@@ -110,7 +110,7 @@ export class Room extends DurableObject<Env> {
     const ipHash = await sha256(this.core.ipSalt() + (request.headers.get('x-cqfd-ip') ?? ''))
     this.ctx.acceptWebSocket(server)
     server.serializeAttachment({ ipHash } satisfies Attachment)
-    await this.ctx.storage.deleteAlarm()
+    // Le minuteur d'effacement n'est annulé qu'une fois le participant réellement entré (voir join).
     return new Response(null, { status: 101, webSocket: client })
   }
 
@@ -127,6 +127,7 @@ export class Room extends DurableObject<Env> {
       const sessionHash = await sha256(msg.session)
       const admin = msg.admin ? this.core.adminAccess(await sha256(msg.admin), timingSafeEqual) : null
       this.core.join(conn, { name: msg.name, sessionHash, admin })
+      if (wrap(ws).att.pid) await this.ctx.storage.deleteAlarm()
       return
     }
     if (msg.t === 'invite') {
@@ -154,12 +155,18 @@ export class Room extends DurableObject<Env> {
   private async afterDisconnect(ws: WebSocket): Promise<void> {
     if (!this.core.isInitialized()) return
     this.core.onClose(wrap(ws))
-    if (this.openConns().length === 0) await this.ctx.storage.setAlarm(Date.now() + this.graceMs())
+    if (!this.hasParticipants()) await this.ctx.storage.setAlarm(Date.now() + this.graceMs())
+  }
+
+  /** Seuls les participants entrés maintiennent la salle en vie (une socket muette ne compte pas). */
+  private hasParticipants(): boolean {
+    return this.openConns().some((c) => c.att.pid)
   }
 
   /** Délai de grâce écoulé : si la salle est toujours vide, on efface tout. */
   override async alarm(): Promise<void> {
-    if (this.openConns().length > 0) return
+    if (this.hasParticipants()) return
+    for (const c of this.openConns()) c.close(CLOSE_CODES.notFound, 'expired')
     await this.ctx.storage.deleteAlarm()
     await this.ctx.storage.deleteAll()
     this.core.reset()
