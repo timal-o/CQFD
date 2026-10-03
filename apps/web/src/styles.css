@@ -1698,3 +1698,173 @@ kbd {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ------------------------------------------------------------ easter eggs */
+
+.logo-button {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.logo-button:active {
+  transform: scale(0.98);
+}
+
+.qed.pi {
+  font-size: 0.6em;
+  font-style: italic;
+  color: #7c3aed;
+}
+
+.meaning.flip {
+  display: inline-block;
+  animation: flip-in 0.35s ease-out;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+@keyframes flip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.piday {
+  display: inline-block;
+  margin-top: 10px !important;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #6b21a8;
+  font-size: 14px;
+}
+
+.math-rain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.math-rain span {
+  position: absolute;
+  top: -60px;
+  font-family: 'Iowan Old Style', Georgia, serif;
+  font-weight: 700;
+  animation: rain-fall linear forwards;
+  opacity: 0.9;
+}
+
+@keyframes rain-fall {
+  to {
+    transform: translateY(calc(100vh + 120px)) rotate(var(--spin));
+    opacity: 0.6;
+  }
+}
+
+.math-rain-banner {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 15px;
+  box-shadow: var(--shadow);
+  animation: flip-in 0.4s ease-out;
+  max-width: calc(100% - 32px);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ page 404 */
+
+.notfound {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px 16px;
+}
+
+.notfound-code {
+  margin: 0;
+  font-family: 'Iowan Old Style', Georgia, serif;
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.chalkboard {
+  width: min(680px, 100%);
+  background: #23412f;
+  background-image: radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.06), transparent 60%);
+  border: 12px solid #8b5a2b;
+  border-radius: 10px;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35), var(--shadow);
+  padding: 22px 26px;
+  color: #f1f5f0;
+  font-family: 'Noteworthy', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.chalk-line {
+  margin: 0 0 6px;
+  clip-path: inset(0 100% 0 0);
+  animation: chalk-write 0.85s ease-out forwards;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.chalk-line code {
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0 6px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+.chalk-qed {
+  margin-top: 12px;
+  text-align: right;
+  font-size: 30px;
+  font-weight: 700;
+  color: #fde68a;
+}
+
+@keyframes chalk-write {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.notfound-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.notfound-actions .primary {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chalk-line,
+  .meaning.flip,
+  .math-rain-banner {
+    animation: none;
+    clip-path: none;
+  }
+}
