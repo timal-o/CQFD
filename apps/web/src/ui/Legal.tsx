@@ -153,6 +153,12 @@ export function Legal() {
               licences-tierces.txt
             </a>
             .
+            {' '}
+            Le code de CQFD est publié sous licence{' '}
+            <a href="https://polyformproject.org/licenses/noncommercial/1.0.0/" target="_blank" rel="noopener noreferrer">
+              PolyForm Noncommercial 1.0.0
+            </a>{' '}
+            : usage libre hors usage commercial.
             {github && (
               <>
                 {' '}
