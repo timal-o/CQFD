@@ -150,7 +150,7 @@ function LatexInput({ value, onChange, onEnter, onEscape }: FieldProps & { value
           autoCorrect="off"
           rows={2}
           aria-label="Source LaTeX"
-          placeholder="\sum_{k=0}^{n} \binom{n}{k} x^k"
+          placeholder="\sum_{k=0}^{n} \binom{n}{k} x^k   (Maj+Entrée : nouvelle ligne)"
           onChange={(e) => {
             onChange(e.target.value)
             refreshSuggestions(e.target.value, e.target.selectionStart)
@@ -174,7 +174,15 @@ function LatexInput({ value, onChange, onEnter, onEscape }: FieldProps & { value
                 return
               }
             }
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && e.shiftKey) {
+              // Maj+Entrée : saut de ligne LaTeX (\\), affiché sur une nouvelle ligne.
+              e.preventDefault()
+              const ta = e.currentTarget
+              const caret = ta.selectionStart
+              const next = value.slice(0, caret) + ' \\\\\n' + value.slice(ta.selectionEnd)
+              pendingCaret.current = caret + 4
+              onChange(next)
+            } else if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               onEnter()
             } else if (e.key === 'Escape') {

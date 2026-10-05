@@ -51,7 +51,17 @@ export const INLINE_SHORTCUTS: Record<string, string> = {
   pi: '\\pi',
 }
 
-type Keycap = string | { latex?: string; insert?: string; label?: string; width?: number; class?: string; tooltip?: string }
+type Keycap =
+  | string
+  | {
+      latex?: string
+      insert?: string
+      label?: string
+      width?: number
+      class?: string
+      tooltip?: string
+      command?: string[]
+    }
 
 export interface KeyboardLayout {
   label: string
@@ -74,7 +84,17 @@ const k = (display: string, insert: string, tooltip?: string, cls?: 'small'): Ke
 /** Fonction usuelle : libellé court, insère « \nom(□) ». */
 const fn = (name: string): Keycap => ({ insert: `\\${name}(#0)`, label: name, class: 'small' })
 
-const NAV_ROW: Keycap[] = ['[undo]', '[redo]', '[separator]', '[left]', '[right]', { label: '[backspace]', width: 1.5 }]
+const NAV_ROW: Keycap[] = [
+  '[undo]',
+  '[redo]',
+  '[separator]',
+  '[left]',
+  '[right]',
+  { label: '[backspace]', width: 1.5 },
+  // Nouvelle ligne (comme Maj+Entrée) : rangée suivante dans un tableau, sinon formule sur plusieurs lignes.
+  { label: '↵ ligne', command: ['performWithFeedback', 'addRowAfter'], width: 1.5, class: 'small', tooltip: 'Nouvelle ligne' },
+  { label: '+ colonne', command: ['performWithFeedback', 'addColumnAfter'], width: 1.5, class: 'small', tooltip: 'Ajouter une colonne (matrice)' },
+]
 
 const SQ = '\\square'
 
@@ -91,7 +111,12 @@ export const KEYBOARD_LAYOUTS: KeyboardLayout[] = [
         k('\\lim', '\\lim_{#0\\to#0}', 'Limite'),
         '\\infty',
         '\\to',
-        '\\mapsto',
+        k(
+          'f\\colon E\\to F',
+          '\\begin{aligned}#0 : #0 &\\to #0\\\\ #0 &\\mapsto #0\\end{aligned}',
+          'Définir une fonction (f : E → F, x ↦ f(x))',
+          'small',
+        ),
         fn('ln'),
         k(`e^{${SQ}}`, 'e^{#0}', 'Exponentielle'),
       ],
@@ -159,7 +184,7 @@ export const KEYBOARD_LAYOUTS: KeyboardLayout[] = [
         k('I_n', 'I_{#0}', 'Matrice identité'),
         '\\mathbb{K}',
         '\\equiv',
-        '\\leftarrow',
+        '\\mapsto',
         '\\rightarrow',
       ],
       NAV_ROW,
@@ -284,6 +309,8 @@ export const LATEX_COMMANDS: { cmd: string; template: string }[] = [
     ['\\text', '\\text{|}'],
     ['\\begin{pmatrix}', '\\begin{pmatrix} | & \\\\  & \\end{pmatrix}'],
     ['\\begin{cases}', '\\begin{cases} | \\\\  \\end{cases}'],
+    ['\\begin{aligned}', '\\begin{aligned} | : &\\to \\\\  &\\mapsto \\end{aligned}'],
+    ['\\mapsto', '\\mapsto'],
     ['\\xrightarrow', '\\xrightarrow{|}'],
     ['\\ln', '\\ln(|)'],
     ['\\exp', '\\exp(|)'],

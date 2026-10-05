@@ -218,6 +218,18 @@ export function Guide() {
               </tr>
             </tbody>
           </table>
+          <h3>Sur plusieurs lignes</h3>
+          <p>
+            <K>Maj</K> + <K>Entrée</K> passe à la ligne (dans les deux modes), ou la touche <strong>↵ ligne</strong> du
+            clavier. Pour définir une fonction comme <em>f : ℝ → ℝ₊*, x ↦ x²</em>, utilisez la touche{' '}
+            <strong>Définir une fonction</strong> (onglet Analyse) : les flèches sont alignées et chaque case se remplit
+            avec <K>Tab</K>.
+          </p>
+          <p>
+            <strong>Systèmes et matrices à rallonge</strong> : <K>Tab</K> dans la toute dernière case ajoute une
+            ligne. Dans une ligne ajoutée laissée vide, <K>Tab</K> sort de la matrice pour continuer à écrire (la ligne
+            vide ne s’affiche pas). Pour une colonne de plus : touche <strong>+ colonne</strong>.
+          </p>
           <p>
             <K>Entrée</K> valide, <K>Échap</K> annule. Pendant la saisie, seule la personne qui écrit voit la formule ;
             les autres la voient dès qu’elle est validée.

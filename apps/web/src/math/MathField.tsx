@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { INLINE_SHORTCUTS } from './config'
+import { atEnvEnd, shouldGrowOnTab } from './lines'
 import { loadMathLive } from './mathlive'
 
 export interface FieldProps {
@@ -13,7 +14,13 @@ export function MathField({ initial, onChange, onEnter, onEscape }: FieldProps &
   const host = useRef<HTMLDivElement>(null)
   const callbacks = useRef({ onChange, onEnter, onEscape })
   callbacks.current = { onChange, onEnter, onEscape }
-  const fieldRef = useRef<{ value: string } | null>(null)
+  const fieldRef = useRef<{
+    value: string
+    position: number
+    lastOffset: number
+    executeCommand(cmd: string): boolean
+    getValue(start: number, end: number, format: 'latex'): string
+  } | null>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -53,7 +60,29 @@ export function MathField({ initial, onChange, onEnter, onEscape }: FieldProps &
       ref={host}
       className="fe-field"
       onKeyDownCapture={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        const f = fieldRef.current
+        if (e.key === 'Tab' && !e.shiftKey && f && f.position < f.lastOffset) {
+          // Tab dans la dernière case d'un système ou d'une matrice (la position suivante sort de
+          // l'environnement) : nouvelle ligne si la dernière est remplie, sinon on sort juste après
+          // la matrice pour continuer à écrire (MathLive, lui, quitterait le champ).
+          const before = f.getValue(0, f.position + 1, 'latex')
+          if (atEnvEnd(before)) {
+            e.preventDefault()
+            e.stopPropagation()
+            if (shouldGrowOnTab(before)) {
+              if (f.executeCommand('addRowAfter')) callbacks.current.onChange(f.value)
+            } else {
+              f.position = f.position + 1
+            }
+            return
+          }
+        }
+        if (e.key === 'Enter' && e.shiftKey) {
+          // Maj+Entrée : nouvelle ligne (rangée suivante dans un tableau, sinon formule sur plusieurs lignes).
+          e.preventDefault()
+          e.stopPropagation()
+          if (fieldRef.current?.executeCommand('addRowAfter')) callbacks.current.onChange(fieldRef.current.value)
+        } else if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault()
           e.stopPropagation()
           // L'événement « input » de MathLive peut arriver après Entrée : on relit la valeur.

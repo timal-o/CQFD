@@ -1,5 +1,6 @@
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { normalizeLines } from './lines'
 
 const cache = new Map<string, string>()
 const MAX_CACHE = 500
@@ -12,7 +13,8 @@ const PLACEHOLDER_RE = /\\placeholder(?:\[[^\]]*\])?\{[^{}]*\}/g
  * \htmlClass… : le LaTeX venant d'un autre participant ne peut pas injecter de HTML actif.
  */
 export function renderLatex(latex: string): string {
-  latex = latex.replace(PLACEHOLDER_RE, '\\square')
+  // Lignes vides retirées d'abord (elles ne contiennent que des cases), puis cases restantes → □.
+  latex = normalizeLines(latex).replace(PLACEHOLDER_RE, '\\square')
   const hit = cache.get(latex)
   if (hit !== undefined) return hit
   let html: string
